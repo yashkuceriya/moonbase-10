@@ -2,13 +2,13 @@
 
 ## What did you build?
 
-Moonbase 10 is an adaptive K–5 math adventure where every mistake maps the learner’s next mission. Instead of simply marking an answer wrong, ORBIT interprets the selected distractor, identifies a likely misconception, updates a Bayesian knowledge trace, and reroutes the learner into a 20-second visual bridge. The learner then returns to the same goal with just enough support to succeed.
+Moonbase 10 is an adaptive K–5 math adventure where every mistake maps the learner’s next mission. Instead of simply marking an answer wrong, ORBIT interprets the selected distractor, identifies a likely misconception, applies a BKT-inspired evidence update, and reroutes the learner into a short visual bridge. The learner then returns to the same goal with just enough support to succeed.
 
 The working prototype includes four missions covering equal groups, regrouping, fractions of sets, and subtraction across ten. A parent/teacher Learning Map makes every adaptation explainable as a signal → decision → next-step trace. The experience runs without an account or API key and collects no student data.
 
-I built it with React and TypeScript as a responsive Cloudflare Worker application. The learning design is grounded in U.S. Institute of Education Sciences guidance on visual representations, systematic instruction, and progress monitoring. Next I would calibrate the knowledge model with consented pilot data, expand the curriculum graph, add tutor handoff, and test accessibility with learners and families.
+I built it with React and TypeScript as a responsive Cloudflare Worker application. The learner model is transparent: the current prototype uses explicit, hand-set parameters rather than claiming calibration it does not have. The learning design is grounded in U.S. Institute of Education Sciences guidance on visual representations, systematic instruction, and progress monitoring. Next I would calibrate the model with consented pilot data, expand the curriculum graph, add tutor handoff, and test accessibility with learners and families.
 
-**Required disclosure:** I used OpenAI Codex for product ideation, implementation assistance, copy refinement, and test generation, and OpenAI image generation for the original social-preview illustration and derived favicon. The runtime does not call a generative-AI service. Open-source software and licenses are listed in `THIRD_PARTY.md`; the primary components are React/React DOM, Vinext, Vite, Tailwind CSS, Cloudflare tooling, TypeScript, and ESLint under MIT and/or Apache-2.0 licenses. I used no real student data, personal information, biometric identification, or third-party copyrighted media.
+**Required disclosure:** I used OpenAI Codex for product ideation, implementation assistance, copy refinement, and test generation, and OpenAI image generation for the original social-preview illustration and derived favicon. The runtime does not call a generative-AI service. Open-source software and licenses are listed in `THIRD_PARTY.md`; the primary components are React/React DOM, Vinext, Vite, Cloudflare tooling, TypeScript, and ESLint under MIT and/or Apache-2.0 licenses. I used no real student data, personal information, biometric identification, or third-party copyrighted media.
 
 ## Demo-video script (2:45 target)
 
@@ -34,19 +34,19 @@ Open the learning detour.
 
 Choose **12**, then choose **24** on the restored full mission.
 
-> Support fades immediately, Nova retries the original problem, and ORBIT records mastery after scaffolded—not independent—success. Productive struggle earns progress instead of a penalty.
+> Support fades immediately, Nova retries the original problem, and ORBIT labels the success as scaffolded rather than independent. Productive struggle earns progress instead of a penalty.
 
-### 1:22–2:05 — Prove the AI is product, not decoration
+### 1:22–2:05 — Show the adaptive engine
 
 Open **Learning map**.
 
-> Under the hood, meaningful distractors feed a misconception graph, and a Bayesian knowledge-tracing model updates mastery by skill. A policy selects the next representation and difficulty. The family or tutor can see the exact signal, decision, and next move—no black box and no wall of scores.
+> Under the hood, meaningful distractors feed a misconception map, and a BKT-inspired update changes the estimate for that skill. The parameters are visible and uncalibrated in this prototype. A deterministic policy selects the lowest-estimated skill for the next mission, and the family or tutor can see the exact signal, decision, and next move.
 
 Point to the updated insight, skill constellation, and adaptation trace.
 
 ### 2:05–2:34 — Establish rigor and fit
 
-> The four working missions cover arrays, place-value regrouping, fractions of sets, and subtraction across ten. The design uses evidence-based visual representations and progress monitoring, and it mirrors Nerdy’s strength in adaptive practice, session intelligence, and expert handoff. It needs no login or API key and collects no student data.
+> The four working missions cover arrays, place-value regrouping, fractions of sets, and subtraction across ten. The design uses evidence-based visual representations and progress monitoring, aligns with Nerdy’s adaptive-practice direction, and creates an explainable trace a future tutor handoff could use. It needs no login or API key and collects no student data.
 
 ### 2:34–2:45 — Close
 

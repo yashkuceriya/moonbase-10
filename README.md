@@ -2,7 +2,7 @@
 
 **Every mistake maps the next mission.**
 
-Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hackathon Challenge. A learner restores a lunar base by solving short math missions. The ORBIT guide uses the meaning of each answer—not only whether it was right—to classify a likely misconception, update a Bayesian knowledge trace, and select a targeted bridge activity before returning to the original goal.
+Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hackathon Challenge. A learner restores a lunar base by solving short math missions. The ORBIT guide uses the meaning of each answer—not only whether it was right—to classify a likely misconception, update a transparent learner estimate, and select a targeted bridge activity before returning to the original goal.
 
 ## Why this entry is different
 
@@ -17,7 +17,7 @@ Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hacka
 ORBIT combines two lightweight techniques:
 
 1. A misconception graph maps semantically meaningful distractors to likely reasoning patterns, such as dropping the final equal group or failing to carry a regrouped ten.
-2. A Bayesian Knowledge Tracing update estimates skill mastery after each observation. A policy uses that estimate, scaffold history, and independence threshold to hold, lower, or raise the next challenge.
+2. A BKT-inspired Bayesian update estimates skill mastery after each observation. Its hand-set prototype parameters are explicit and not yet calibrated on learner data. After a completed mission, a deterministic policy selects the lowest-estimated skill among the other available missions.
 
 The current prototype includes four complete learning loops: equal groups, place-value regrouping, fractions of sets, and subtraction across ten.
 
@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Then open the local URL printed by the development server. Run `npm test` for the production build and server-render checks.
+Then open the local URL printed by the development server. Run `npm run verify` for lint, strict type checking, the production build, server-render checks, and adaptive-model unit tests.
 
 ## Demo path
 

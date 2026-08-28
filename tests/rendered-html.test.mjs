@@ -6,14 +6,14 @@ const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
 const templateRoot = new URL("../", import.meta.url);
 
-async function render() {
+async function render(host = "localhost") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
     new Request("http://localhost/", {
-      headers: { accept: "text/html", host: "localhost" },
+      headers: { accept: "text/html", host },
     }),
     {
       ASSETS: {
@@ -45,13 +45,21 @@ test("server-renders the Moonbase 10 learner mission", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton|Your site is taking shape/);
 });
 
+test("does not trust an arbitrary request host for social metadata", async () => {
+  const response = await render("attacker.example");
+  const html = await response.text();
+
+  assert.doesNotMatch(html, /attacker\.example/);
+  assert.match(html, /https:\/\/moonbase-10\.yashv10k\.chatgpt\.site\/og\.jpg/);
+});
+
 test("ships product metadata, research grounding, and no starter preview", async () => {
   const [page, layout, css, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    access(new URL("../public/og.png", import.meta.url)),
+    access(new URL("../public/og.jpg", import.meta.url)),
     access(new URL("../public/favicon.png", import.meta.url)),
   ]);
 
@@ -62,7 +70,7 @@ test("ships product metadata, research grounding, and no starter preview", async
   assert.match(page, /ADAPTATION TRACE/);
   assert.match(page, /https:\/\/ies\.ed\.gov\/ncee\/wwc\/practiceguide\/26/);
   assert.match(layout, /generateMetadata/);
-  assert.match(layout, /new URL\("\/og\.png", baseUrl\)/);
+  assert.match(layout, /new URL\("\/og\.jpg", baseUrl\)/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.doesNotMatch(page + layout + css, /codex-preview|_sites-preview|SkeletonPreview|Starter Project/);
