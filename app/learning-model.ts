@@ -1,12 +1,32 @@
 export type SkillKey = "arrays" | "placeValue" | "fractions" | "subtraction";
+export type SkillLevel = 1 | 2 | 3;
 
 export type Mastery = Record<SkillKey, number>;
+export type SkillLevels = Record<SkillKey, SkillLevel>;
+export type SkillEvidence = Record<
+  SkillKey,
+  { independentWins: number; scaffoldedWins: number; nearMisses: number }
+>;
 
 export const STARTING_MASTERY: Mastery = {
   arrays: 68,
   placeValue: 81,
   fractions: 62,
   subtraction: 54,
+};
+
+export const STARTING_LEVELS: SkillLevels = {
+  arrays: 2,
+  placeValue: 2,
+  fractions: 1,
+  subtraction: 1,
+};
+
+export const EMPTY_EVIDENCE: SkillEvidence = {
+  arrays: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
+  placeValue: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
+  fractions: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
+  subtraction: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
 };
 
 /**
@@ -31,20 +51,90 @@ export function traceMastery(priorPercent: number, correct: boolean, scaffolded 
 }
 
 export function chooseNextMissionIndex(
-  missions: ReadonlyArray<{ skill: SkillKey }>,
+  missions: ReadonlyArray<{ skill: SkillKey; level: SkillLevel }>,
   currentIndex: number,
   mastery: Mastery,
+  levels: SkillLevels,
 ) {
   if (missions.length < 2) return 0;
 
-  return missions.reduce((bestIndex, candidate, candidateIndex) => {
-    if (candidateIndex === currentIndex) return bestIndex;
-    if (bestIndex === currentIndex) return candidateIndex;
+  const currentSkill = missions[currentIndex]?.skill;
+  const availableSkills = Array.from(new Set(missions.map((mission) => mission.skill)));
+  const otherSkills = availableSkills.filter((skill) => skill !== currentSkill);
+  const skillPool = otherSkills.length > 0 ? otherSkills : availableSkills;
+  const nextSkill = skillPool.reduce((best, skill) =>
+    mastery[skill] < mastery[best] ? skill : best,
+  );
+  const targetLevel = levels[nextSkill];
+  const candidates = missions
+    .map((mission, index) => ({ mission, index }))
+    .filter(({ mission, index }) => mission.skill === nextSkill && index !== currentIndex)
+    .sort((a, b) => {
+      const distance = Math.abs(a.mission.level - targetLevel) - Math.abs(b.mission.level - targetLevel);
+      return distance || a.mission.level - b.mission.level || a.index - b.index;
+    });
 
-    return mastery[candidate.skill] < mastery[missions[bestIndex].skill]
-      ? candidateIndex
-      : bestIndex;
-  }, currentIndex);
+  return candidates[0]?.index ?? currentIndex;
+}
+
+export function updateSkillLevel(
+  currentLevel: SkillLevel,
+  correct: boolean,
+  scaffolded = false,
+): SkillLevel {
+  if (!correct || scaffolded) return currentLevel;
+  return Math.min(3, currentLevel + 1) as SkillLevel;
+}
+
+const SKILL_NAMES: Record<SkillKey, string> = {
+  arrays: "Equal groups & arrays",
+  placeValue: "Place value & regrouping",
+  fractions: "Fractions of sets",
+  subtraction: "Subtracting across ten",
+};
+
+const LEVEL_NAMES: Record<SkillLevel, string> = {
+  1: "Build",
+  2: "Connect",
+  3: "Transfer",
+};
+
+export function buildTutorBrief({
+  mastery,
+  levels,
+  evidence,
+  attempts,
+  completed,
+  detours,
+  latestSignal,
+  nextMove,
+}: {
+  mastery: Mastery;
+  levels: SkillLevels;
+  evidence: SkillEvidence;
+  attempts: number;
+  completed: number;
+  detours: number;
+  latestSignal: string;
+  nextMove: string;
+}) {
+  const skillRows = (Object.keys(mastery) as SkillKey[]).map((skill) => {
+    const observations = evidence[skill];
+    return `- ${SKILL_NAMES[skill]}: ${mastery[skill]}% prototype estimate; ${LEVEL_NAMES[levels[skill]]} level; ${observations.independentWins} independent, ${observations.scaffoldedWins} scaffolded, ${observations.nearMisses} near-miss`;
+  });
+
+  return [
+    "MOONBASE 10 · TUTOR BRIEF",
+    `Session: ${attempts} attempts · ${completed} missions completed · ${detours} targeted detours`,
+    "",
+    `Latest learning signal: ${latestSignal}`,
+    `Recommended next move: ${nextMove}`,
+    "",
+    "Skill evidence:",
+    ...skillRows,
+    "",
+    "Note: Estimates are BKT-inspired with hand-set, uncalibrated prototype parameters. Use this brief as a conversation starter, not a grade or diagnosis.",
+  ].join("\n");
 }
 
 export function getMissionProgress(completed: number) {

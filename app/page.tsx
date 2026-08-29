@@ -2,244 +2,98 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  EMPTY_EVIDENCE,
+  STARTING_LEVELS,
   STARTING_MASTERY,
+  buildTutorBrief,
   chooseNextMissionIndex,
   getMissionProgress,
   traceMastery,
-  type SkillKey,
+  updateSkillLevel,
 } from "./learning-model";
+import { MISSIONS, type VisualData } from "./missions";
 
 type Phase = "question" | "adaptive" | "scaffold" | "retry" | "success";
-type Mission = {
-  id: string;
-  eyebrow: string;
-  title: string;
-  story: string;
-  prompt: string;
-  equation: string;
-  options: number[];
-  answer: number;
-  skill: SkillKey;
-  skillLabel: string;
-  visual: "array" | "base-ten" | "fraction" | "number-line";
-  insightByAnswer: Record<number, string>;
-  defaultInsight: string;
-  learnerRead: string;
-  whyThisChallenge: string;
-  nudge: string;
-  nextMove: string;
-  nextMoveWhy: string;
-  scaffold: {
-    prompt: string;
-    equation: string;
-    options: number[];
-    answer: number;
-    coach: string;
-    wrongFeedback: string;
-  };
-  celebration: string;
-};
-
-const MISSIONS: Mission[] = [
-  {
-    id: "solar-array",
-    eyebrow: "Mission 04 · Solar Array",
-    title: "Wake the west wing",
-    story: "Six solar rows must power the habitat before lunar night.",
-    prompt: "The array has 6 rows of 4 cells. How many cells are working?",
-    equation: "6 × 4 = ?",
-    options: [10, 20, 24, 28],
-    answer: 24,
-    skill: "arrays",
-    skillLabel: "Equal groups",
-    visual: "array",
-    insightByAnswer: {
-      10: "You added the two factors instead of making equal groups.",
-      20: "You counted five rows and dropped the final group of four.",
-      28: "You counted one extra group of four.",
-    },
-    defaultInsight: "The groups are visible, but the total is not stable yet.",
-    learnerRead: "Nova recognizes equal groups when an array is visible and is learning to translate every row into multiplication.",
-    whyThisChallenge: "A structured array connects Nova’s reliable skip-counting to multiplication.",
-    nudge: "Let’s shrink the array, touch every row, then come right back.",
-    nextMove: "Keep the array for one more challenge, then fade two rows and ask Nova to reconstruct the missing groups.",
-    nextMoveWhy: "Strengthens equal-group structure",
-    scaffold: {
-      prompt: "Build 3 rows of 4 cells. How many cells altogether?",
-      equation: "4 + 4 + 4 = ?",
-      options: [7, 12, 16],
-      answer: 12,
-      coach: "Each row is one equal group. Count all three groups: 4, 8, 12.",
-      wrongFeedback: "Touch each of the three rows once and add 4 + 4 + 4.",
-    },
-    celebration: "All six rows are online. You connected an array to repeated addition.",
-  },
-  {
-    id: "cargo-bay",
-    eyebrow: "Mission 05 · Cargo Bay",
-    title: "Balance the supply lift",
-    story: "Two cargo crews are combining oxygen canisters for the climb.",
-    prompt: "One crew loaded 27 canisters and another loaded 36. How many total?",
-    equation: "27 + 36 = ?",
-    options: [53, 63, 73, 613],
-    answer: 63,
-    skill: "placeValue",
-    skillLabel: "Place value",
-    visual: "base-ten",
-    insightByAnswer: {
-      53: "You combined the ones, but the regrouped ten did not reach the tens column.",
-      73: "An extra ten slipped into the total.",
-      613: "You joined digits instead of combining their place values.",
-    },
-    defaultInsight: "The ones need to be regrouped before the tens are combined.",
-    learnerRead: "Nova combines tens and ones reliably until a sum creates a new ten that must move columns.",
-    whyThisChallenge: "Base-ten blocks make the regrouped ten visible before Nova returns to notation.",
-    nudge: "Let’s pack 13 ones into one ten and three ones.",
-    nextMove: "Build one more regrouping problem with base-ten blocks, then replace the blocks with a written tens-and-ones record.",
-    nextMoveWhy: "Connects concrete regrouping to notation",
-    scaffold: {
-      prompt: "Seven ones plus six ones makes 13. How many tens do we regroup?",
-      equation: "7 ones + 6 ones = 1 ten + 3 ones",
-      options: [0, 1, 13],
-      answer: 1,
-      coach: "Ten of the ones snap together into one new ten. Three ones remain.",
-      wrongFeedback: "Make a bundle of ten from the 13 ones. Count how many complete tens that creates.",
-    },
-    celebration: "Lift balanced. You regrouped across place values without losing a ten.",
-  },
-  {
-    id: "water-vault",
-    eyebrow: "Mission 06 · Water Vault",
-    title: "Share the moonwater",
-    story: "Three of the four greenhouse pods need an equal water ration.",
-    prompt: "The tank holds 12 liters. What is 3/4 of the tank?",
-    equation: "¾ of 12 = ?",
-    options: [3, 4, 8, 9],
-    answer: 9,
-    skill: "fractions",
-    skillLabel: "Fractions of sets",
-    visual: "fraction",
-    insightByAnswer: {
-      3: "You found one fourth, but the mission needs three fourths.",
-      4: "You used the denominator as the answer instead of making four equal groups.",
-      8: "You filled two groups instead of three.",
-    },
-    defaultInsight: "The set must be split into four equal groups before taking three.",
-    learnerRead: "Nova can find a unit fraction of a set and is learning to combine the requested number of equal groups.",
-    whyThisChallenge: "Equal water groups connect the denominator, unit fraction, and requested numerator.",
-    nudge: "First find one fourth. Then take that amount three times.",
-    nextMove: "Partition a new set into four equal groups, then compare one fourth with three fourths before removing the visual dividers.",
-    nextMoveWhy: "Separates the roles of numerator and denominator",
-    scaffold: {
-      prompt: "If 12 liters split into 4 equal groups, how many liters are in one group?",
-      equation: "12 ÷ 4 = ?",
-      options: [3, 4, 6],
-      answer: 3,
-      coach: "One fourth is 3 liters. Three fourths is three groups of 3.",
-      wrongFeedback: "Share all 12 liters equally across four groups, then count the liters in just one group.",
-    },
-    celebration: "The greenhouse is hydrated. You found a fraction by making equal groups.",
-  },
-  {
-    id: "return-route",
-    eyebrow: "Mission 07 · Return Route",
-    title: "Plot the rover home",
-    story: "The rover is 52 marks out. Its return route covers 28 marks.",
-    prompt: "Where will the rover be after traveling back 28 marks from 52?",
-    equation: "52 − 28 = ?",
-    options: [24, 26, 34, 80],
-    answer: 24,
-    skill: "subtraction",
-    skillLabel: "Subtraction across ten",
-    visual: "number-line",
-    insightByAnswer: {
-      26: "You subtracted the ones without crossing back through the ten.",
-      34: "You took away 18 rather than 28.",
-      80: "You combined the distances instead of finding what remains.",
-    },
-    defaultInsight: "Crossing the ten is easier when the jump is split into 20 and 8.",
-    learnerRead: "Nova subtracts whole tens reliably and is learning to decompose a two-digit jump across a ten.",
-    whyThisChallenge: "A number line exposes the intermediate landing point in a subtraction-across-ten strategy.",
-    nudge: "Take one clean jump of 20 first. Then hop back 8.",
-    nextMove: "Keep the intermediate landing point visible for one more problem, then hide it and ask Nova to name the two jumps.",
-    nextMoveWhy: "Builds a reusable decomposition strategy",
-    scaffold: {
-      prompt: "Start at 52 and jump back 20. Where do you land?",
-      equation: "52 − 20 = ?",
-      options: [22, 32, 48],
-      answer: 32,
-      coach: "Subtracting two tens changes only the tens digit: 52 becomes 32.",
-      wrongFeedback: "Jump back two whole tens from 52. The ones digit stays 2 while the tens digit changes.",
-    },
-    celebration: "Rover recovered. You decomposed a hard jump into two friendly jumps.",
-  },
-];
-
-function ArrayVisual({ small = false }: { small?: boolean }) {
-  const rows = small ? 3 : 6;
-  const cells = Array.from({ length: rows * 4 }, (_, index) => index);
+function ArrayVisual({ rows, columns, fadedRows = 0 }: Extract<VisualData, { kind: "array" }>) {
+  const cells = Array.from({ length: rows * columns }, (_, index) => index);
+  const fadeFrom = (rows - fadedRows) * columns;
 
   return (
-    <div className={`array-visual ${small ? "array-visual--small" : ""}`} role="img" aria-label={`${rows} rows of 4 solar cells`}>
+    <div className="array-visual" style={{ gridTemplateColumns: `repeat(${columns}, minmax(24px, 54px))` }} role="img" aria-label={`${rows} rows of ${columns} solar cells${fadedRows ? `, with ${fadedRows} rows faded` : ""}`}>
       {cells.map((cell) => (
-        <span key={cell} className="solar-cell" />
+        <span key={cell} className={`solar-cell ${cell >= fadeFrom ? "solar-cell--faded" : ""}`} />
       ))}
     </div>
   );
 }
 
-function BaseTenVisual() {
+function BlockGroup({ value }: { value: number }) {
+  const tens = Math.floor(value / 10);
+  const ones = value % 10;
+
   return (
-    <div className="base-ten-visual" role="img" aria-label="Two groups of base ten blocks showing 27 and 36">
-      <div className="block-group">
-        <span className="group-label">27</span>
-        <div className="ten-rods"><i /><i /></div>
-        <div className="ones">{Array.from({ length: 7 }, (_, i) => <i key={i} />)}</div>
-      </div>
+    <div className="block-group">
+      <span className="group-label">{value}</span>
+      <div className="ten-rods">{Array.from({ length: tens }, (_, i) => <i key={i} />)}</div>
+      <div className="ones">{Array.from({ length: ones }, (_, i) => <i key={i} />)}</div>
+    </div>
+  );
+}
+
+function BaseTenVisual({ left, right }: Extract<VisualData, { kind: "base-ten" }>) {
+  return (
+    <div className="base-ten-visual" role="img" aria-label={`Two groups of base-ten blocks showing ${left} and ${right}`}>
+      <BlockGroup value={left} />
       <span className="visual-plus">+</span>
-      <div className="block-group">
-        <span className="group-label">36</span>
-        <div className="ten-rods"><i /><i /><i /></div>
-        <div className="ones">{Array.from({ length: 6 }, (_, i) => <i key={i} />)}</div>
-      </div>
+      <BlockGroup value={right} />
     </div>
   );
 }
 
-function FractionVisual() {
+function FractionVisual({ total, denominator, numerator }: Extract<VisualData, { kind: "fraction" }>) {
+  const groupSize = total / denominator;
+
   return (
-    <div className="fraction-visual" role="img" aria-label="Twelve water units divided into four equal groups">
-      {Array.from({ length: 12 }, (_, i) => (
-        <span key={i} className="water-cell"><i /></span>
+    <div className="fraction-visual" style={{ gridTemplateColumns: `repeat(${total}, 1fr)` }} role="img" aria-label={`${total} units divided into ${denominator} equal groups, with ${numerator} groups highlighted`}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={`water-cell ${i < groupSize * numerator ? "water-cell--selected" : ""}`}><i /></span>
       ))}
-      <div className="fraction-brace brace-1">¼</div>
-      <div className="fraction-brace brace-2">¼</div>
-      <div className="fraction-brace brace-3">¼</div>
-      <div className="fraction-brace brace-4">¼</div>
+      {Array.from({ length: denominator }, (_, group) => (
+        <div key={group} className="fraction-brace" style={{ width: `calc(${100 / denominator}% - 5px)`, left: `${(100 / denominator) * group}%` }}>1/{denominator}</div>
+      ))}
     </div>
   );
 }
 
-function NumberLineVisual({ small = false }: { small?: boolean }) {
-  const jump = small ? 20 : 28;
+function NumberLineVisual({ start, subtract }: Extract<VisualData, { kind: "number-line" }>) {
+  const result = start - subtract;
+  const min = Math.floor(result / 10) * 10;
+  const max = Math.ceil(start / 10) * 10;
+  const range = Math.max(10, max - min);
+  const ticks = Array.from({ length: range / 10 + 1 }, (_, index) => min + index * 10);
+  const startPosition = ((start - min) / range) * 100;
+  const resultPosition = ((result - min) / range) * 100;
+
   return (
-    <div className="number-line-visual" role="img" aria-label={`Number line from 20 to 55 with a rover at 52 and a jump back ${jump}`}>
-      <div className="rover-marker"><span>●</span><b>52</b></div>
-      <div className="line-track">
-        {[20, 25, 30, 35, 40, 45, 50, 55].map((number) => (
-          <span key={number}><i />{number}</span>
-        ))}
+    <div className="number-line-visual" role="img" aria-label={`Number line from ${min} to ${max} with a rover at ${start} and a jump back ${subtract}`}>
+      <div className="number-line-content">
+        <div className="rover-marker" style={{ left: `${startPosition}%` }}><span>●</span><b>{start}</b></div>
+        <div className="line-track">
+          {ticks.map((number) => (
+            <span key={number}><i />{number}</span>
+          ))}
+        </div>
+        <div className="jump-label" style={{ left: `${resultPosition}%`, right: `${100 - startPosition}%` }}>← jump back {subtract}</div>
       </div>
-      <div className="jump-label">← jump back {jump}</div>
     </div>
   );
 }
 
-function MissionVisual({ mission, small = false }: { mission: Mission; small?: boolean }) {
-  if (mission.visual === "array") return <ArrayVisual small={small} />;
-  if (mission.visual === "base-ten") return <BaseTenVisual />;
-  if (mission.visual === "fraction") return <FractionVisual />;
-  return <NumberLineVisual small={small} />;
+function MissionVisual({ visual }: { visual: VisualData }) {
+  if (visual.kind === "array") return <ArrayVisual {...visual} />;
+  if (visual.kind === "base-ten") return <BaseTenVisual {...visual} />;
+  if (visual.kind === "fraction") return <FractionVisual {...visual} />;
+  return <NumberLineVisual {...visual} />;
 }
 
 function Rover() {
@@ -253,11 +107,12 @@ function Rover() {
   );
 }
 
-function SkillMeter({ label, value, tone }: { label: string; value: number; tone: string }) {
+function SkillMeter({ label, value, tone, level, evidence }: { label: string; value: number; tone: string; level: string; evidence: string }) {
   return (
     <div className="skill-meter">
       <div className="skill-meter__label"><span>{label}</span><strong>{value}%</strong></div>
       <div className="meter-track"><i className={tone} style={{ width: `${value}%` }} /></div>
+      <div className="skill-meter__evidence"><span>{level}</span><small>{evidence}</small></div>
     </div>
   );
 }
@@ -274,7 +129,10 @@ export default function Home() {
   const [detours, setDetours] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [mastery, setMastery] = useState(STARTING_MASTERY);
+  const [levels, setLevels] = useState(STARTING_LEVELS);
+  const [evidence, setEvidence] = useState(EMPTY_EVIDENCE);
   const [lastMasteryDelta, setLastMasteryDelta] = useState(0);
+  const [briefStatus, setBriefStatus] = useState("");
   const [traceEvents, setTraceEvents] = useState([
     {
       message: "ORBIT opened with an array to connect Nova’s skip-counting to equal groups.",
@@ -289,6 +147,8 @@ export default function Home() {
   const activePrompt = phase === "scaffold" ? mission.scaffold.prompt : mission.prompt;
   const activeEquation = phase === "scaffold" ? mission.scaffold.equation : mission.equation;
   const activeOptions = phase === "scaffold" ? mission.scaffold.options : mission.options;
+  const activeVisual = phase === "scaffold" ? mission.scaffold.visual : mission.visual;
+  const levelName = (level: number) => ["", "Build", "Connect", "Transfer"][level];
 
   const orbitHeadline = useMemo(() => {
     if (phase === "adaptive") return "Pattern spotted — rerouting";
@@ -328,14 +188,26 @@ export default function Home() {
 
     if (value === mission.answer) {
       const prior = mastery[mission.skill];
-      const updated = traceMastery(prior, true, phase === "retry");
+      const scaffolded = phase === "retry";
+      const updated = traceMastery(prior, true, scaffolded);
+      const nextLevel = updateSkillLevel(levels[mission.skill], true, scaffolded);
       setPhase("success");
       setStreak((current) => current + 1);
+      setCompleted((current) => current + 1);
       setMastery((current) => ({ ...current, [mission.skill]: updated }));
+      setLevels((current) => ({ ...current, [mission.skill]: nextLevel }));
+      setEvidence((current) => ({
+        ...current,
+        [mission.skill]: {
+          ...current[mission.skill],
+          [scaffolded ? "scaffoldedWins" : "independentWins"]:
+            current[mission.skill][scaffolded ? "scaffoldedWins" : "independentWins"] + 1,
+        },
+      }));
       setLastMasteryDelta(updated - prior);
       recordEvent(
-        `Nova solved ${mission.skillLabel.toLowerCase()} ${phase === "retry" ? "after one scaffold" : "independently"}. ORBIT will target the lowest remaining skill estimate next.`,
-        `${updated - prior >= 0 ? "+" : ""}${updated - prior} evidence points · ${phase === "retry" ? "scaffolded" : "independent"} success`,
+        `Nova solved ${mission.skillLabel.toLowerCase()} ${scaffolded ? "after one scaffold" : "independently"}. ${scaffolded ? "Support stays at the same level until independent evidence appears." : `ORBIT advanced this skill to ${levelName(nextLevel)}.`}`,
+        `${updated - prior >= 0 ? "+" : ""}${updated - prior} evidence points · ${scaffolded ? "scaffolded" : "independent"} success`,
       );
       return;
     }
@@ -348,6 +220,13 @@ export default function Home() {
     const prior = mastery[mission.skill];
     const updated = traceMastery(prior, false);
     setMastery((current) => ({ ...current, [mission.skill]: updated }));
+    setEvidence((current) => ({
+      ...current,
+      [mission.skill]: {
+        ...current[mission.skill],
+        nearMisses: current[mission.skill].nearMisses + 1,
+      },
+    }));
     setLastMasteryDelta(updated - prior);
     recordEvent(
       `Near-miss classified: ${insight} ORBIT paused difficulty and selected a prerequisite micro-step.`,
@@ -362,18 +241,38 @@ export default function Home() {
   }
 
   function nextMission() {
-    const nextIndex = chooseNextMissionIndex(MISSIONS, missionIndex, mastery);
+    const nextIndex = chooseNextMissionIndex(MISSIONS, missionIndex, mastery, levels);
     const next = MISSIONS[nextIndex];
-    setCompleted((current) => current + 1);
     setMissionIndex(nextIndex);
     setPhase("question");
     setSelected(null);
     setMisconception("");
     setScaffoldMessage("");
+    setBriefStatus("");
     recordEvent(
-      `ORBIT selected ${next.skillLabel.toLowerCase()} because it has the lowest current estimate among the other mission skills.`,
-      `Next mission · ${next.title}`,
+      `ORBIT selected ${next.skillLabel.toLowerCase()} at ${next.levelLabel.toLowerCase()} level because it has the lowest current estimate among the other skills.`,
+      `Next mission · ${next.title} · ${next.levelLabel} representation`,
     );
+  }
+
+  async function copyTutorBrief() {
+    const brief = buildTutorBrief({
+      mastery,
+      levels,
+      evidence,
+      attempts,
+      completed,
+      detours,
+      latestSignal: misconception || mission.learnerRead,
+      nextMove: mission.nextMove,
+    });
+
+    try {
+      await navigator.clipboard.writeText(brief);
+      setBriefStatus("Tutor brief copied. Nothing was uploaded.");
+    } catch {
+      setBriefStatus("Clipboard access is unavailable in this browser.");
+    }
   }
 
   function resetDemo() {
@@ -388,7 +287,10 @@ export default function Home() {
     setDetours(0);
     setAttempts(0);
     setMastery(STARTING_MASTERY);
+    setLevels(STARTING_LEVELS);
+    setEvidence(EMPTY_EVIDENCE);
     setLastMasteryDelta(0);
+    setBriefStatus("");
     setTraceEvents([
       {
         message: "ORBIT opened with an array to connect Nova’s skip-counting to equal groups.",
@@ -440,11 +342,11 @@ export default function Home() {
             <article className={`challenge-card phase-${phase}`}>
               <div className="challenge-heading">
                 <div><span className="step-kicker">YOUR NEXT MOVE</span><h2>{activePrompt}</h2></div>
-                <span className="skill-chip">{mission.skillLabel}</span>
+                <div className="challenge-tags"><span className="level-chip">{mission.levelLabel} {mission.level}/3</span><span className="skill-chip">{mission.skillLabel}</span></div>
               </div>
 
               <div className="problem-stage">
-                <MissionVisual mission={mission} small={phase === "scaffold"} />
+                <MissionVisual visual={activeVisual} />
                 <div className="equation-card">
                   <small>{phase === "scaffold" ? "BRIDGE STEP" : "MISSION MATH"}</small>
                   <strong>{activeEquation}</strong>
@@ -524,7 +426,7 @@ export default function Home() {
                   <div className="mini-map">
                     <div className="mini-map__labels"><span>Support</span><span>Challenge</span></div>
                     <div className="zone-bar"><i /><b style={{ left: `${mastery[mission.skill]}%` }} /></div>
-                    <small>Inside Nova’s productive zone</small>
+                    <small>{mission.levelLabel} representation · level {mission.level} of 3</small>
                   </div>
                   <div className="orbit-footer-note"><span>✦</span><p><strong>Mistakes are data.</strong><br />A near miss changes the very next step.</p></div>
                 </>
@@ -560,11 +462,11 @@ export default function Home() {
 
             <article className="insight-card mastery-card">
               <div className="card-title"><div><span>SKILL CONSTELLATION</span><h2>Evidence by skill</h2></div><span className={lastMasteryDelta < 0 ? "trend-down" : "trend-up"}>{lastMasteryDelta === 0 ? "No new evidence" : `${lastMasteryDelta > 0 ? "+" : ""}${lastMasteryDelta}`}</span></div>
-              <SkillMeter label="Equal groups & arrays" value={mastery.arrays} tone="lime" />
-              <SkillMeter label="Place value & regrouping" value={mastery.placeValue} tone="purple" />
-              <SkillMeter label="Fractions of sets" value={mastery.fractions} tone="orange" />
-              <SkillMeter label="Subtracting across ten" value={mastery.subtraction} tone="blue" />
-              <p className="meter-note"><i /> BKT-inspired prototype estimate with hand-set, uncalibrated parameters. The next mission targets the lowest current skill estimate.</p>
+              <SkillMeter label="Equal groups & arrays" value={mastery.arrays} tone="lime" level={`${levelName(levels.arrays)} ${levels.arrays}/3`} evidence={`${evidence.arrays.independentWins} independent · ${evidence.arrays.scaffoldedWins} scaffolded`} />
+              <SkillMeter label="Place value & regrouping" value={mastery.placeValue} tone="purple" level={`${levelName(levels.placeValue)} ${levels.placeValue}/3`} evidence={`${evidence.placeValue.independentWins} independent · ${evidence.placeValue.scaffoldedWins} scaffolded`} />
+              <SkillMeter label="Fractions of sets" value={mastery.fractions} tone="orange" level={`${levelName(levels.fractions)} ${levels.fractions}/3`} evidence={`${evidence.fractions.independentWins} independent · ${evidence.fractions.scaffoldedWins} scaffolded`} />
+              <SkillMeter label="Subtracting across ten" value={mastery.subtraction} tone="blue" level={`${levelName(levels.subtraction)} ${levels.subtraction}/3`} evidence={`${evidence.subtraction.independentWins} independent · ${evidence.subtraction.scaffoldedWins} scaffolded`} />
+              <p className="meter-note"><i /> BKT-inspired prototype estimate with hand-set, uncalibrated parameters. Independent success advances Build → Connect → Transfer; scaffolded success holds the level.</p>
             </article>
 
             <article className="insight-card evidence-timeline">
@@ -579,6 +481,14 @@ export default function Home() {
             <article className="insight-card family-card">
               <div className="family-visual"><Rover /><span className="orbit-loop" /></div>
               <div><span>TRY THIS TOGETHER</span><h2>Turn dinner into an array hunt.</h2><p>Find something arranged in equal rows—an ice tray, egg carton, or window grid. Ask: “How many without counting one by one?”</p></div>
+            </article>
+
+            <article className="insight-card tutor-card">
+              <div className="card-title"><div><span>HUMAN HANDOFF</span><h2>Give a tutor the useful five-minute version</h2></div><span className="privacy-badge">Device only</span></div>
+              <p>Copy the latest signal, support history, skill levels, and recommended next move. The brief is generated in this browser and is never sent by Moonbase 10.</p>
+              <div className="handoff-flow" aria-label="Handoff flow"><span>Mistake</span><i>→</i><span>Bridge</span><i>→</i><span>Evidence</span><i>→</i><span>Tutor</span></div>
+              <button className="handoff-button" onClick={copyTutorBrief}>Copy tutor brief <span>↗</span></button>
+              <small className="copy-status" aria-live="polite">{briefStatus || "No account or student-data upload required."}</small>
             </article>
           </div>
 

@@ -8,6 +8,8 @@ Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hacka
 
 - **A mistake changes the next 20 seconds.** Near misses trigger a specific, no-penalty detour rather than generic feedback.
 - **The AI is explainable.** The Learning Map exposes the signal, decision, and next step to a parent, teacher, or tutor.
+- **Progress means less support, not only more points.** Each skill moves through authored Build, Connect, and Transfer representations only after independent evidence.
+- **The handoff is usable.** A device-only tutor brief turns the session trace into a concise next-conversation starter without uploading student data.
 - **The pedagogy is visible.** Arrays, base-ten blocks, fraction sets, and number lines connect concrete representations to symbols.
 - **The demo is dependable.** The complete adaptive loop works without an account, API key, network call, or real learner data.
 - **The privacy posture is simple.** No login, advertising, analytics, biometric inference, or student-data collection.
@@ -17,9 +19,9 @@ Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hacka
 ORBIT combines two lightweight techniques:
 
 1. A misconception graph maps semantically meaningful distractors to likely reasoning patterns, such as dropping the final equal group or failing to carry a regrouped ten.
-2. A BKT-inspired Bayesian update estimates skill mastery after each observation. Its hand-set prototype parameters are explicit and not yet calibrated on learner data. After a completed mission, a deterministic policy selects the lowest-estimated skill among the other available missions.
+2. A BKT-inspired Bayesian update estimates skill mastery after each observation. Its hand-set prototype parameters are explicit and not yet calibrated on learner data. After a completed mission, a deterministic policy selects the lowest-estimated skill among the other available skills at the learner’s current representation level.
 
-The current prototype includes four complete learning loops: equal groups, place-value regrouping, fractions of sets, and subtraction across ten.
+The current prototype includes 12 authored and automatically validated mission variants: Build, Connect, and Transfer items for equal groups, place-value regrouping, fractions of sets, and subtraction across ten. Independent success advances the representation level; scaffolded success records recovery while holding the level until independent evidence appears.
 
 ## Run locally
 
@@ -35,7 +37,8 @@ Then open the local URL printed by the development server. Run `npm run verify` 
 1. On Mission 04, choose **20**. ORBIT recognizes that the final row was dropped.
 2. Open the learning detour and choose **12** for `4 + 4 + 4`.
 3. Return to the full mission and choose **24**.
-4. Open **Learning map** to show the updated mastery estimate and adaptation trace.
+4. Open **Learning map** to show the updated mastery estimate, representation level, and adaptation trace.
+5. Choose **Copy tutor brief** to generate the device-only human handoff.
 
 Full submission copy and the timed video script are in [SUBMISSION.md](./SUBMISSION.md). Third-party and generative-AI disclosures are in [THIRD_PARTY.md](./THIRD_PARTY.md).
 

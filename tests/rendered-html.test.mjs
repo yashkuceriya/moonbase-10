@@ -39,6 +39,7 @@ test("server-renders the Moonbase 10 learner mission", async () => {
   assert.match(html, /6 rows of 4 cells/);
   assert.match(html, /Learner mission/);
   assert.match(html, /Learning map/);
+  assert.match(html, /Connect.*2.*\/3/);
   assert.match(html, /ORBIT/);
   assert.match(html, /Every mistake maps the next mission/);
   assert.doesNotMatch(html, developmentPreviewMeta);
@@ -68,6 +69,8 @@ test("ships product metadata, research grounding, and no starter preview", async
   assert.match(page, /^"use client";/);
   assert.match(page, /misconception/i);
   assert.match(page, /ADAPTATION TRACE/);
+  assert.match(page, /HUMAN HANDOFF/);
+  assert.match(page, /Copy tutor brief/);
   assert.match(page, /https:\/\/ies\.ed\.gov\/ncee\/wwc\/practiceguide\/26/);
   assert.match(layout, /generateMetadata/);
   assert.match(layout, /new URL\("\/og\.jpg", baseUrl\)/);
