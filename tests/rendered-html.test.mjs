@@ -69,8 +69,12 @@ test("ships product metadata, research grounding, and no starter preview", async
   assert.match(page, /^"use client";/);
   assert.match(page, /misconception/i);
   assert.match(page, /ADAPTATION TRACE/);
-  assert.match(page, /HUMAN HANDOFF/);
-  assert.match(page, /Copy tutor brief/);
+  assert.match(page, /ORBIT TUTOR COPILOT/);
+  assert.match(page, /Human approval required/);
+  assert.match(page, /Create tutor co-plan/);
+  assert.match(page, /Approve this plan for Nova/);
+  assert.match(page, /Copy evidence brief/);
+  assert.match(page, /TESTED LEARNER MISSION/);
   assert.match(page, /https:\/\/ies\.ed\.gov\/ncee\/wwc\/practiceguide\/26/);
   assert.match(layout, /generateMetadata/);
   assert.match(layout, /new URL\("\/og\.jpg", baseUrl\)/);

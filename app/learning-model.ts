@@ -81,9 +81,10 @@ export function updateSkillLevel(
   currentLevel: SkillLevel,
   correct: boolean,
   scaffolded = false,
+  observedLevel = currentLevel,
 ): SkillLevel {
   if (!correct || scaffolded) return currentLevel;
-  return Math.min(3, currentLevel + 1) as SkillLevel;
+  return Math.max(currentLevel, Math.min(3, observedLevel + 1)) as SkillLevel;
 }
 
 const SKILL_NAMES: Record<SkillKey, string> = {

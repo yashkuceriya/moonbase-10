@@ -245,15 +245,40 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outlin
 .family-card { background: var(--ink); color: white; display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 22px; overflow: hidden; }
 .family-card > div > span { color: var(--lime); }.family-card h2 { font-size: 24px; letter-spacing: -.04em; margin: 7px 0; }.family-card p { color: rgba(255,255,255,.57); font-size: 12px; line-height: 1.5; margin: 0; }
 .family-visual { height: 160px; position: relative; border-radius: 18px; background: radial-gradient(circle, rgba(139,130,246,.35), transparent 65%); }.family-visual .rover { top: 52px; left: 31px; transform: scale(1.08); }.orbit-loop { position: absolute; inset: 23px 12px; border: 1px dashed rgba(223,241,107,.3); border-radius: 50%; transform: rotate(-18deg); }
-.tutor-card { display: grid; align-content: start; gap: 16px; background: linear-gradient(145deg, rgba(255,253,246,.92), rgba(223,241,107,.13)); }
+.tutor-card { grid-column: 1 / -1; display: grid; align-content: start; gap: 16px; background: linear-gradient(145deg, rgba(255,253,246,.96), rgba(223,241,107,.13)); }
 .tutor-card > p { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 0; }
 .privacy-badge { color: #586712 !important; background: rgba(223,241,107,.4); border-radius: 999px; padding: 6px 9px; letter-spacing: .03em !important; white-space: nowrap; }
-.handoff-flow { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-.handoff-flow span { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 7px 9px; font-size: 9px; font-weight: 800; }
-.handoff-flow i { color: #665eaa; font-style: normal; }
+.level-picker { border: 0; padding: 0; margin: 2px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.level-picker legend { color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; margin-bottom: 8px; }
+.level-picker button { border: 1px solid var(--line); background: rgba(255,255,255,.7); border-radius: 14px; padding: 11px 13px; cursor: pointer; text-align: left; display: grid; gap: 3px; }
+.level-picker button[aria-pressed="true"] { color: white; background: var(--ink); border-color: var(--ink); box-shadow: 0 7px 20px rgba(16,19,45,.16); }
+.level-picker button strong { font-size: 12px; }
+.level-picker button small { color: var(--muted); font-size: 9px; }.level-picker button[aria-pressed="true"] small { color: rgba(255,255,255,.6); }
+.copilot-actions { display: flex; gap: 8px; }
 .handoff-button { border: 0; border-radius: 13px; background: var(--ink); color: white; padding: 13px 15px; font-size: 12px; font-weight: 850; cursor: pointer; display: flex; justify-content: space-between; }
 .handoff-button span { color: var(--lime); }
+.handoff-button:disabled, .approve-plan:disabled { cursor: wait; opacity: .72; }
+.copilot-actions .handoff-button { flex: 1; }
+.brief-button { border: 1px solid var(--line); background: rgba(255,255,255,.75); border-radius: 13px; padding: 12px 15px; font-size: 10px; font-weight: 800; cursor: pointer; }
+.copilot-plan { border-radius: 18px; background: var(--ink); color: white; padding: 20px; display: grid; gap: 15px; box-shadow: 0 16px 35px rgba(16,19,45,.16); }
+.plan-source { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.plan-source span { color: var(--lime); font-size: 8px; font-weight: 850; letter-spacing: .13em; }
+.plan-source small { color: rgba(255,255,255,.45); font-size: 8px; }
+.copilot-plan h3 { font-size: clamp(22px, 3vw, 34px); letter-spacing: -.04em; line-height: 1.08; margin: 0; max-width: 800px; }
+.copilot-plan > p { color: rgba(255,255,255,.62); font-size: 11px; line-height: 1.55; margin: 0; max-width: 900px; }
+.talk-moves { list-style: none; padding: 0; margin: 2px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.talk-moves li { border: 1px solid rgba(255,255,255,.11); background: rgba(255,255,255,.055); border-radius: 14px; padding: 13px; display: grid; grid-template-columns: 25px 1fr; gap: 9px; }
+.talk-moves li > span { width: 24px; height: 24px; border-radius: 50%; background: var(--lime); color: var(--ink); display: grid; place-items: center; font-size: 9px; font-weight: 900; }
+.talk-moves strong { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.talk-moves p { color: rgba(255,255,255,.7); font-size: 10px; line-height: 1.45; margin: 5px 0 0; }
+.look-for { border-left: 3px solid var(--orange); padding: 4px 0 4px 12px; }.look-for span { color: var(--orange); font-size: 8px; font-weight: 850; letter-spacing: .13em; }.look-for p { margin: 4px 0 0; font-size: 10px; color: rgba(255,255,255,.72); }
+.approved-mission-preview { border: 1px solid rgba(223,241,107,.24); background: rgba(223,241,107,.07); border-radius: 14px; padding: 14px; display: grid; gap: 5px; }
+.approved-mission-preview > span { color: var(--lime); font-size: 8px; font-weight: 850; letter-spacing: .13em; }
+.approved-mission-preview strong { font-size: 14px; }.approved-mission-preview p { color: rgba(255,255,255,.76); font-size: 11px; margin: 0; }.approved-mission-preview small { color: rgba(255,255,255,.44); font-size: 9px; }
+.safety-row { display: flex; gap: 6px; flex-wrap: wrap; }.safety-row span { color: rgba(255,255,255,.62); background: rgba(255,255,255,.07); border-radius: 999px; padding: 5px 8px; font-size: 8px; }
+.approve-plan { border: 0; border-radius: 12px; background: var(--lime); color: var(--ink); padding: 12px 14px; font-weight: 850; font-size: 11px; cursor: pointer; display: flex; justify-content: space-between; }
 .copy-status { color: var(--muted); font-size: 9px; min-height: 13px; }
+.copy-status--error { color: #883e20; }
 .map-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }.map-actions .primary-action { width: auto; gap: 32px; }.reset-button { border: 1px solid var(--line); background: transparent; border-radius: 13px; padding: 12px 16px; font-size: 11px; font-weight: 800; cursor: pointer; }
 
 .product-footer { border-top: 1px solid var(--line); padding: 24px 4vw 36px; display: flex; align-items: center; justify-content: space-between; gap: 30px; color: var(--muted); }
@@ -294,6 +319,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outlin
   .session-summary span { min-width: 0; flex: 1; padding: 12px 8px; }
   .session-summary { display: flex; }
   .family-card { grid-template-columns: 1fr; }.family-visual { height: 120px; }
+  .level-picker, .talk-moves { grid-template-columns: 1fr; }
+  .copilot-actions { flex-direction: column; }
+  .plan-source { align-items: flex-start; flex-direction: column; }
   .map-actions { align-items: stretch; flex-direction: column; }
   .map-actions .primary-action { width: 100%; }
   .product-footer { align-items: flex-start; flex-direction: column; padding-inline: 20px; }

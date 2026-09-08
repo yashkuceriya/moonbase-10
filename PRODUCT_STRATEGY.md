@@ -41,8 +41,8 @@ Implication: adaptation should change the representation and size of the leap, t
 1. **Twelve authored item variants, not four repeated prompts.** Each skill now has Build, Connect, and Transfer missions.
 2. **Independence controls progression.** Independent success advances the representation level. Scaffolded recovery records useful evidence but holds the level.
 3. **Every primary distractor carries a hypothesis.** Automated core-content checks ensure no mission-level wrong option falls back to meaningless “try again” feedback.
-4. **Math stays deterministic.** The runtime does not delegate arithmetic to a language model. Future generative features should coach or author against vetted item data, with benchmarks and human review.
-5. **Human handoff is part of the loop.** The Learning Map can copy a compact, device-only tutor brief with the latest signal, support history, level, and next move.
+4. **Math stays deterministic.** The runtime never delegates arithmetic to a language model. Optional Structured Outputs refine tutor-facing Socratic language, while a validator and local fallback keep the experience dependable.
+5. **Human handoff is part of the loop.** The Tutor Copilot proposes a three-move plan, the tutor selects Build, Connect, or Transfer, and an explicit approval changes the learner route. A device-only evidence brief is also available.
 6. **Claims remain honest.** Mastery estimates are explicitly BKT-inspired, hand-set, and uncalibrated. They are not grades or diagnoses.
 
 ## Judge story
@@ -52,7 +52,7 @@ Implication: adaptation should change the representation and size of the leap, t
 3. Show the misconception-specific detour, complete `3 × 4`, and retry `6 × 4`.
 4. Show that scaffolded success is not mislabeled as independence.
 5. Open the Learning Map and point to signal → decision → evidence.
-6. Copy the tutor brief to close the Live + AI loop.
+6. Ask ORBIT Tutor Copilot for a Transfer plan, review its source and safety boundary, approve it, and launch the changed learner mission.
 
 ## Next evidence, not next feature
 

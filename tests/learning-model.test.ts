@@ -54,6 +54,8 @@ test("only independent evidence advances representation level", () => {
   assert.equal(updateSkillLevel(3, true), 3);
   assert.equal(updateSkillLevel(2, true, true), 2);
   assert.equal(updateSkillLevel(2, false), 2);
+  assert.equal(updateSkillLevel(2, true, false, 1), 2);
+  assert.equal(updateSkillLevel(1, true, false, 3), 3);
 });
 
 test("real mission routing selects the needed skill at its current representation level", () => {

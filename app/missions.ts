@@ -1,4 +1,4 @@
-import type { SkillKey, SkillLevel } from "./learning-model";
+import type { SkillKey, SkillLevel } from "./learning-model.ts";
 
 export type VisualData =
   | { kind: "array"; rows: number; columns: number; fadedRows?: number }

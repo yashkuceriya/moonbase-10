@@ -9,11 +9,14 @@ import {
   chooseNextMissionIndex,
   getMissionProgress,
   traceMastery,
+  type SkillLevel,
   updateSkillLevel,
 } from "./learning-model";
+import type { TutorPlan } from "./copilot";
 import { MISSIONS, type VisualData } from "./missions";
 
 type Phase = "question" | "adaptive" | "scaffold" | "retry" | "success";
+type CopilotState = "idle" | "loading" | "ready" | "queued" | "error";
 function ArrayVisual({ rows, columns, fadedRows = 0 }: Extract<VisualData, { kind: "array" }>) {
   const cells = Array.from({ length: rows * columns }, (_, index) => index);
   const fadeFrom = (rows - fadedRows) * columns;
@@ -133,6 +136,11 @@ export default function Home() {
   const [evidence, setEvidence] = useState(EMPTY_EVIDENCE);
   const [lastMasteryDelta, setLastMasteryDelta] = useState(0);
   const [briefStatus, setBriefStatus] = useState("");
+  const [copilotLevel, setCopilotLevel] = useState<SkillLevel>(3);
+  const [copilotPlan, setCopilotPlan] = useState<TutorPlan | null>(null);
+  const [copilotState, setCopilotState] = useState<CopilotState>("idle");
+  const [copilotMessage, setCopilotMessage] = useState("");
+  const [queuedMissionIndex, setQueuedMissionIndex] = useState<number | null>(null);
   const [traceEvents, setTraceEvents] = useState([
     {
       message: "ORBIT opened with an array to connect Nova’s skip-counting to equal groups.",
@@ -148,6 +156,7 @@ export default function Home() {
   const activeEquation = phase === "scaffold" ? mission.scaffold.equation : mission.equation;
   const activeOptions = phase === "scaffold" ? mission.scaffold.options : mission.options;
   const activeVisual = phase === "scaffold" ? mission.scaffold.visual : mission.visual;
+  const copilotMission = copilotPlan ? MISSIONS.find((candidate) => candidate.id === copilotPlan.recommendedMissionId) : null;
   const levelName = (level: number) => ["", "Build", "Connect", "Transfer"][level];
 
   const orbitHeadline = useMemo(() => {
@@ -190,7 +199,8 @@ export default function Home() {
       const prior = mastery[mission.skill];
       const scaffolded = phase === "retry";
       const updated = traceMastery(prior, true, scaffolded);
-      const nextLevel = updateSkillLevel(levels[mission.skill], true, scaffolded);
+      const currentLevel = levels[mission.skill];
+      const nextLevel = updateSkillLevel(currentLevel, true, scaffolded, mission.level);
       setPhase("success");
       setStreak((current) => current + 1);
       setCompleted((current) => current + 1);
@@ -206,7 +216,7 @@ export default function Home() {
       }));
       setLastMasteryDelta(updated - prior);
       recordEvent(
-        `Nova solved ${mission.skillLabel.toLowerCase()} ${scaffolded ? "after one scaffold" : "independently"}. ${scaffolded ? "Support stays at the same level until independent evidence appears." : `ORBIT advanced this skill to ${levelName(nextLevel)}.`}`,
+        `Nova solved ${mission.skillLabel.toLowerCase()} ${scaffolded ? "after one scaffold" : "independently"}. ${scaffolded ? "Support stays at the same level until independent evidence appears." : nextLevel > currentLevel ? `ORBIT advanced this skill to ${levelName(nextLevel)}.` : `ORBIT confirmed the current ${levelName(currentLevel)} level without inflating it.`}`,
         `${updated - prior >= 0 ? "+" : ""}${updated - prior} evidence points · ${scaffolded ? "scaffolded" : "independent"} success`,
       );
       return;
@@ -249,13 +259,106 @@ export default function Home() {
     setMisconception("");
     setScaffoldMessage("");
     setBriefStatus("");
+    setCopilotLevel(Math.min(3, next.level + 1) as SkillLevel);
+    setCopilotPlan(null);
+    setCopilotState("idle");
+    setCopilotMessage("");
+    setQueuedMissionIndex(null);
     recordEvent(
       `ORBIT selected ${next.skillLabel.toLowerCase()} at ${next.levelLabel.toLowerCase()} level because it has the lowest current estimate among the other skills.`,
       `Next mission · ${next.title} · ${next.levelLabel} representation`,
     );
   }
 
+  async function createCopilotPlan() {
+    setCopilotState("loading");
+    setCopilotMessage("ORBIT is turning the evidence into a tutor-reviewable plan…");
+    setCopilotPlan(null);
+    setQueuedMissionIndex(null);
+    const skillEvidence = evidence[mission.skill];
+
+    try {
+      const response = await fetch("/api/orbit-plan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          missionId: mission.id,
+          targetLevel: copilotLevel,
+          mastery: mastery[mission.skill],
+          latestSignal: misconception || mission.learnerRead,
+          independentWins: skillEvidence.independentWins,
+          scaffoldedWins: skillEvidence.scaffoldedWins,
+          nearMisses: skillEvidence.nearMisses,
+        }),
+      });
+      if (!response.ok) throw new Error("Copilot request failed");
+
+      const plan = await response.json() as TutorPlan;
+      const recommendedIndex = MISSIONS.findIndex((candidate) => candidate.id === plan.recommendedMissionId);
+      if (
+        recommendedIndex < 0
+        || MISSIONS[recommendedIndex].skill !== mission.skill
+        || plan.safety?.mathSource !== "authored-and-tested"
+        || plan.safety?.answerWithheld !== true
+        || plan.safety?.storedByMoonbase !== false
+      ) {
+        throw new Error("Copilot returned an invalid mission");
+      }
+
+      setCopilotPlan(plan);
+      setCopilotState("ready");
+      setCopilotMessage(
+        plan.source === "openai"
+          ? "OpenAI shaped the tutoring language; Moonbase kept the math authored and tested."
+          : "ORBIT’s verified engine created this plan without requiring an external model or learner-data storage.",
+      );
+    } catch {
+      setCopilotState("error");
+      setCopilotMessage("ORBIT could not create a plan right now. The learner route is unchanged.");
+    }
+  }
+
+  function approveCopilotPlan() {
+    if (!copilotPlan) return;
+    const approvedIndex = MISSIONS.findIndex((candidate) => candidate.id === copilotPlan.recommendedMissionId);
+    if (approvedIndex < 0) return;
+
+    const approved = MISSIONS[approvedIndex];
+    setQueuedMissionIndex(approvedIndex);
+    setCopilotState("queued");
+    setCopilotMessage(`Tutor approved “${approved.title}” for Nova. The learner route will change only when launched.`);
+    recordEvent(
+      `Human review approved ${approved.skillLabel.toLowerCase()} at ${approved.levelLabel.toLowerCase()} level. ORBIT queued the plan without changing the learner route yet.`,
+      `Tutor-approved handoff · ${approved.title}`,
+    );
+  }
+
+  function continueFromMap() {
+    if (queuedMissionIndex !== null) {
+      const approved = MISSIONS[queuedMissionIndex];
+      setMissionIndex(queuedMissionIndex);
+      setPhase("question");
+      setSelected(null);
+      setMisconception("");
+      setScaffoldMessage("");
+      setView("mission");
+      recordEvent(
+        `Nova’s route changed to the tutor-approved ${approved.levelLabel.toLowerCase()} mission.`,
+        `Human + AI handoff launched · ${approved.title}`,
+      );
+      setQueuedMissionIndex(null);
+      setCopilotPlan(null);
+      setCopilotState("idle");
+      setCopilotMessage("");
+      return;
+    }
+
+    if (phase === "success") nextMission();
+    setView("mission");
+  }
+
   async function copyTutorBrief() {
+    setCopilotMessage("");
     const brief = buildTutorBrief({
       mastery,
       levels,
@@ -291,6 +394,11 @@ export default function Home() {
     setEvidence(EMPTY_EVIDENCE);
     setLastMasteryDelta(0);
     setBriefStatus("");
+    setCopilotLevel(3);
+    setCopilotPlan(null);
+    setCopilotState("idle");
+    setCopilotMessage("");
+    setQueuedMissionIndex(null);
     setTraceEvents([
       {
         message: "ORBIT opened with an array to connect Nova’s skip-counting to equal groups.",
@@ -484,16 +592,46 @@ export default function Home() {
             </article>
 
             <article className="insight-card tutor-card">
-              <div className="card-title"><div><span>HUMAN HANDOFF</span><h2>Give a tutor the useful five-minute version</h2></div><span className="privacy-badge">Device only</span></div>
-              <p>Copy the latest signal, support history, skill levels, and recommended next move. The brief is generated in this browser and is never sent by Moonbase 10.</p>
-              <div className="handoff-flow" aria-label="Handoff flow"><span>Mistake</span><i>→</i><span>Bridge</span><i>→</i><span>Evidence</span><i>→</i><span>Tutor</span></div>
-              <button className="handoff-button" onClick={copyTutorBrief}>Copy tutor brief <span>↗</span></button>
-              <small className="copy-status" aria-live="polite">{briefStatus || "No account or student-data upload required."}</small>
+              <div className="card-title"><div><span>ORBIT TUTOR COPILOT</span><h2>AI proposes. A human decides what Nova sees.</h2></div><span className="privacy-badge">Human approval required</span></div>
+              <p>ORBIT turns the latest learning signal into a short Socratic plan. A tutor chooses the support level, reviews the language, and explicitly approves a tested mission before the learner route changes.</p>
+
+              <fieldset className="level-picker">
+                <legend>Choose the next representation</legend>
+                {([1, 2, 3] as SkillLevel[]).map((level) => (
+                  <button key={level} type="button" aria-pressed={copilotLevel === level} onClick={() => { setCopilotLevel(level); setCopilotPlan(null); setCopilotState("idle"); setCopilotMessage(""); setQueuedMissionIndex(null); }}>
+                    <strong>{levelName(level)}</strong><small>{level === 1 ? "More structure" : level === 2 ? "Connect models" : "Test transfer"}</small>
+                  </button>
+                ))}
+              </fieldset>
+
+              <div className="copilot-actions">
+                <button className="handoff-button" onClick={createCopilotPlan} disabled={copilotState === "loading"}>{copilotState === "loading" ? "Building verified plan…" : "Create tutor co-plan"}<span>✦</span></button>
+                <button className="brief-button" onClick={copyTutorBrief}>Copy evidence brief</button>
+              </div>
+
+              {copilotPlan && (
+                <div className="copilot-plan">
+                  <div className="plan-source"><span>{copilotPlan.source === "openai" ? "OPENAI · STRUCTURED OUTPUT" : "ORBIT · VERIFIED PLAN"}</span><small>Math remains authored + tested</small></div>
+                  <h3>{copilotPlan.headline}</h3>
+                  <p>{copilotPlan.rationale}</p>
+                  <ol className="talk-moves">
+                    <li><span>1</span><div><strong>Notice</strong><p>{copilotPlan.noticePrompt}</p></div></li>
+                    <li><span>2</span><div><strong>Represent</strong><p>{copilotPlan.representPrompt}</p></div></li>
+                    <li><span>3</span><div><strong>Fade</strong><p>{copilotPlan.fadePrompt}</p></div></li>
+                  </ol>
+                  <div className="look-for"><span>TUTOR LOOK-FOR</span><p>{copilotPlan.tutorLookFor}</p></div>
+                  {copilotMission && <div className="approved-mission-preview"><span>TESTED LEARNER MISSION</span><strong>{copilotMission.title}</strong><p>{copilotMission.prompt}</p><small>{copilotMission.equation} · {copilotMission.levelLabel} {copilotMission.level}/3</small></div>}
+                  <div className="safety-row"><span>✓ Answer withheld</span><span>✓ Tested math</span><span>✓ Not stored by Moonbase</span></div>
+                  <button className="approve-plan" onClick={approveCopilotPlan} disabled={copilotState === "queued"}>{copilotState === "queued" ? "Approved and queued ✓" : "Approve this plan for Nova"}<span>→</span></button>
+                </div>
+              )}
+
+              <small className={`copy-status ${copilotState === "error" ? "copy-status--error" : ""}`} aria-live="polite">{copilotMessage || briefStatus || "Only skill evidence—not a learner name or account—is sent when the optional AI enhancement is configured."}</small>
             </article>
           </div>
 
           <div className="map-actions">
-            <button className="primary-action" onClick={() => setView("mission")}>Continue Nova’s mission <span>→</span></button>
+            <button className="primary-action" onClick={continueFromMap}>{queuedMissionIndex !== null ? "Launch tutor-approved mission" : "Continue Nova’s mission"} <span>→</span></button>
             <button className="reset-button" onClick={resetDemo}>Reset demo</button>
           </div>
         </section>

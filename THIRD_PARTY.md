@@ -4,7 +4,9 @@
 
 - **OpenAI Codex:** product ideation, implementation assistance, learning-flow copy, CSS, documentation, and test generation. The entrant directed the work and should review and be able to explain the submitted implementation.
 - **OpenAI image generation:** original `public/og.jpg` social-preview illustration. `public/favicon.png` is a resized crop derived from the same generated image.
-- **Runtime:** no generative-AI API, remote model, biometric identification, voiceprint, facial recognition, analytics SDK, or real student data is used by the prototype.
+- **Optional OpenAI runtime:** when an `OPENAI_API_KEY` is configured, the server-side Tutor Copilot calls the OpenAI Responses API with Structured Outputs to refine tutor-facing Socratic language. It sends bounded skill evidence without learner names or accounts, requests `store: false`, rejects numerical answer leakage and diagnostic language, and falls back to a local verified plan. It never generates or scores learner-facing arithmetic.
+- **Current default runtime:** the complete adaptive game and verified Tutor Copilot work without a remote model. The interface identifies whether a plan used OpenAI or the verified fallback.
+- **Excluded capabilities:** the prototype uses no biometric identification, voiceprint, facial recognition, analytics SDK, or real student data.
 
 ## Original and public material
 
