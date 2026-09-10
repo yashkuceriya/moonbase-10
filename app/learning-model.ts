@@ -5,7 +5,7 @@ export type Mastery = Record<SkillKey, number>;
 export type SkillLevels = Record<SkillKey, SkillLevel>;
 export type SkillEvidence = Record<
   SkillKey,
-  { independentWins: number; scaffoldedWins: number; nearMisses: number }
+  { independentWins: number; scaffoldedWins: number; nearMisses: number; transferWins: number; transferNeedsSupport: number }
 >;
 
 export const STARTING_MASTERY: Mastery = {
@@ -23,10 +23,10 @@ export const STARTING_LEVELS: SkillLevels = {
 };
 
 export const EMPTY_EVIDENCE: SkillEvidence = {
-  arrays: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
-  placeValue: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
-  fractions: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
-  subtraction: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0 },
+  arrays: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0, transferWins: 0, transferNeedsSupport: 0 },
+  placeValue: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0, transferWins: 0, transferNeedsSupport: 0 },
+  fractions: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0, transferWins: 0, transferNeedsSupport: 0 },
+  subtraction: { independentWins: 0, scaffoldedWins: 0, nearMisses: 0, transferWins: 0, transferNeedsSupport: 0 },
 };
 
 /**
@@ -121,7 +121,7 @@ export function buildTutorBrief({
 }) {
   const skillRows = (Object.keys(mastery) as SkillKey[]).map((skill) => {
     const observations = evidence[skill];
-    return `- ${SKILL_NAMES[skill]}: ${mastery[skill]}% prototype estimate; ${LEVEL_NAMES[levels[skill]]} level; ${observations.independentWins} independent, ${observations.scaffoldedWins} scaffolded, ${observations.nearMisses} near-miss`;
+    return `- ${SKILL_NAMES[skill]}: ${mastery[skill]}% prototype estimate; ${LEVEL_NAMES[levels[skill]]} level; ${observations.independentWins} independent, ${observations.scaffoldedWins} scaffolded, ${observations.nearMisses} near-miss; new-number checks: ${observations.transferWins} passed, ${observations.transferNeedsSupport} need support`;
   });
 
   return [

@@ -171,3 +171,31 @@ test("API requires a browser origin outside local development", async () => {
 
   assert.equal(response.status, 403);
 });
+
+test("API caps undeclared streaming bodies before reading the entire request", async () => {
+  let cancelled = false;
+  const stream = new ReadableStream({
+    pull(controller) { controller.enqueue(new Uint8Array(4097)); },
+    cancel() { cancelled = true; },
+  });
+  const oversized = new Request("https://moonbase.test/api/orbit-plan", {
+    method: "POST", headers: { "content-type": "application/json", origin: "https://moonbase.test", "cf-connecting-ip": "198.51.100.70" },
+    body: stream, duplex: "half",
+  } as RequestInit);
+  const result = await handleCopilotRequest(oversized, {}, async () => { throw new Error("Must not call a model"); });
+  assert.equal(result.status, 413);
+  assert.equal(cancelled, true);
+});
+
+test("API handles model timeouts and refusals with the same usable authored fallback", async () => {
+  const fetchers = [
+    async () => { throw new DOMException("Timed out", "TimeoutError"); },
+    async () => Response.json({ output: [{ content: [{ type: "refusal", refusal: "Cannot comply" }] }] }),
+    async () => new Response("Unavailable", { status: 503 }),
+  ];
+  for (const [index, fetcher] of fetchers.entries()) {
+    const result = await handleCopilotRequest(request(INPUT, `198.51.100.${80 + index}`), { OPENAI_API_KEY: "test-secret" }, fetcher);
+    assert.equal(result.status, 200);
+    assert.deepEqual(await result.json(), buildVerifiedTutorPlan(INPUT));
+  }
+});

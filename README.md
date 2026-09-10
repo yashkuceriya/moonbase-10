@@ -9,6 +9,7 @@ Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hacka
 - **A mistake changes the next 20 seconds.** Near misses trigger a specific, no-penalty detour rather than generic feedback.
 - **The AI is explainable.** The Learning Map exposes the signal, decision, and next step to a parent, teacher, or tutor.
 - **Progress means less support, not only more points.** Each skill moves through authored Build, Connect, and Transfer representations only after independent evidence.
+- **Recovery is followed by a different problem.** Twelve additional checks use new numbers and contexts without a worked example. Their first-attempt results appear separately in the Learning Map and tutor brief; replay never earns fresh mastery or rewards.
 - **Human + AI is a working loop.** ORBIT proposes a Socratic co-plan, a tutor chooses the representation level, and the learner route changes only after explicit approval.
 - **Generated language cannot control the math.** Optional OpenAI Structured Outputs shape tutor-facing language; authored, tested missions remain the only learner-facing mathematics, with a verified fallback on any failure.
 - **The pedagogy is visible.** Arrays, base-ten blocks, fraction sets, and number lines connect concrete representations to symbols.
@@ -23,7 +24,7 @@ ORBIT combines three techniques:
 2. A BKT-inspired Bayesian update estimates skill mastery after each observation. Its hand-set prototype parameters are explicit and not yet calibrated on learner data. After a completed mission, a deterministic policy selects the lowest-estimated skill among the other available skills at the learner’s current representation level.
 3. A supervised Tutor Copilot converts the same evidence into a three-move Socratic plan. When `OPENAI_API_KEY` is configured, server-side OpenAI Structured Outputs may refine the tutoring language. Runtime validation rejects numerical answer leakage or diagnostic claims, and the verified local plan takes over on refusal, timeout, malformed output, or missing configuration.
 
-The current prototype includes 12 authored and automatically validated mission variants: Build, Connect, and Transfer items for equal groups, place-value regrouping, fractions of sets, and subtraction across ten. Independent success advances the representation level; scaffolded success records recovery while holding the level until independent evidence appears.
+The current prototype includes 12 authored and automatically validated mission variants plus 12 separate new-number checks. Build, Connect, and Transfer missions cover equal groups, place-value regrouping, fractions of sets, and subtraction across ten. Independent success advances the representation level; scaffolded success records recovery while holding the level until independent evidence appears. Immediate transfer is recorded separately from recovery and is not evidence of long-term retention. Starting estimates and base progress belong to the explicitly labeled fictional demo profile.
 
 ## Run locally
 
@@ -39,7 +40,7 @@ Copy `.env.example` to `.env` and add an OpenAI API key only if you want the opt
 1. On Mission 04, choose **20**. ORBIT recognizes that the final row was dropped.
 2. Open the learning detour and choose **12** for `4 + 4 + 4`.
 3. Return to the full mission and choose **24**.
-4. Open **Learning map** to show the updated mastery estimate, representation level, and adaptation trace.
+4. Try the new-number check: five trays of seven seedlings. Choose **35**, then open **Learning map** to show recovery and immediate transfer as separate evidence.
 5. In **ORBIT Tutor Copilot**, choose **Transfer**, create the co-plan, and review the three Socratic moves.
 6. Approve the plan, then launch the tutor-approved transfer mission for Nova.
 7. **Copy evidence brief** remains available for a device-only handoff.

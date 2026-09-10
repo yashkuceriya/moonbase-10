@@ -6,7 +6,7 @@
 
 The market is already full of adaptive question sequencing, rewards, and generic AI chat. Moonbase should win on a more specific loop:
 
-`meaningful distractor → misconception hypothesis → targeted representation → faded support → original goal → explainable human handoff`
+`meaningful distractor → misconception hypothesis → targeted representation → original goal → new-number check → human handoff`
 
 That loop is the product, not a chatbot attached to a worksheet.
 
@@ -44,6 +44,7 @@ Implication: adaptation should change the representation and size of the leap, t
 4. **Math stays deterministic.** The runtime never delegates arithmetic to a language model. Optional Structured Outputs refine tutor-facing Socratic language, while a validator and local fallback keep the experience dependable.
 5. **Human handoff is part of the loop.** The Tutor Copilot proposes a three-move plan, the tutor selects Build, Connect, or Transfer, and an explicit approval changes the learner route. A device-only evidence brief is also available.
 6. **Claims remain honest.** Mastery estimates are explicitly BKT-inspired, hand-set, and uncalibrated. They are not grades or diagnoses.
+7. **Test the strategy beyond the rehearsed answer.** Each mission has a separate new-number check. First-attempt results are tracked independently, and replayed questions cannot inflate mastery or farm rewards. Immediate transfer remains distinct from delayed retention.
 
 ## Judge story
 
@@ -51,7 +52,7 @@ Implication: adaptation should change the representation and size of the leap, t
 2. Choose the plausible near miss `20` on `6 × 4`.
 3. Show the misconception-specific detour, complete `3 × 4`, and retry `6 × 4`.
 4. Show that scaffolded success is not mislabeled as independence.
-5. Open the Learning Map and point to signal → decision → evidence.
+5. Choose **35** on the new five-trays-of-seven check, then show separate recovery and immediate-transfer evidence in the Learning Map.
 6. Ask ORBIT Tutor Copilot for a Transfer plan, review its source and safety boundary, approve it, and launch the changed learner mission.
 
 ## Next evidence, not next feature

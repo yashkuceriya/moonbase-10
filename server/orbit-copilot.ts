@@ -173,10 +173,35 @@ export async function handleCopilotRequest(
     return jsonResponse({ error: "Request is too large" }, 413);
   }
 
-  const body = await request.text();
-  if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
-    return jsonResponse({ error: "Request is too large" }, 413);
+  // Enforce the cap while streaming, including requests without Content-Length.
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    if (reader) {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_BODY_BYTES) {
+          await reader.cancel();
+          return jsonResponse({ error: "Request is too large" }, 413);
+        }
+        chunks.push(value);
+      }
+    }
+  } catch {
+    return jsonResponse({ error: "Could not read request" }, 400);
+  } finally {
+    reader?.releaseLock();
   }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const body = new TextDecoder().decode(bytes);
 
   let parsed: unknown;
   try {

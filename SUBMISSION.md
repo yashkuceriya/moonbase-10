@@ -4,9 +4,9 @@
 
 Moonbase 10 is an adaptive K–5 math adventure where every mistake maps the learner’s next mission. Instead of simply marking an answer wrong, ORBIT interprets the selected distractor, identifies a likely misconception, applies a BKT-inspired evidence update, and reroutes the learner into a short visual bridge. The learner then returns to the same goal with just enough support to succeed.
 
-The working prototype includes 12 authored mission variants: Build, Connect, and Transfer levels for equal groups, regrouping, fractions of sets, and subtraction across ten. Independent evidence fades support; scaffolded recovery is recorded without pretending it was independent. A parent/teacher Learning Map makes every adaptation explainable as a signal → decision → next-step trace. ORBIT Tutor Copilot then proposes a three-move Socratic plan, lets a human choose the support level, and changes the learner route only after explicit approval.
+The working prototype includes 12 authored missions and 12 separate new-number checks for equal groups, regrouping, fractions of sets, and subtraction across ten. The learner recovers the original problem, then can test the same strategy in a different context. First-attempt transfer and scaffolded recovery are recorded separately; replay cannot earn fresh mastery or rewards. A Learning Map explains each decision. ORBIT Tutor Copilot proposes a Socratic plan and lets a human choose and approve the next mission.
 
-I built it with React and TypeScript as a responsive Cloudflare Worker application. The learner model is transparent: the current prototype uses explicit, hand-set parameters rather than claiming calibration it does not have. Automated core-content checks verify that each mission answer matches its mathematical representation and every primary distractor has a misconception hypothesis. The optional OpenAI layer uses Structured Outputs only for tutor-facing language; validation blocks numerical answer leakage and diagnostic claims, and an authored fallback keeps the entire demo operational without an API key. The learning design is grounded in U.S. Institute of Education Sciences guidance on visual representations, systematic instruction, and progress monitoring. Next I would calibrate the model with consented pilot data, expand the curriculum graph, and test accessibility and learning transfer with learners, tutors, and families.
+I built it with React and TypeScript as a Cloudflare Worker application. The BKT-inspired model uses explicit, hand-set parameters and is not calibrated on learner data. Automated tests verify arithmetic, evidence handling, and the server API. Optional OpenAI Structured Outputs refine tutor-facing language; additional checks reject numbers and known diagnostic terms, while authored coaching handles missing configuration, refusal, timeout, or connection failure. Human review remains necessary. The learning design draws on U.S. Institute of Education Sciences guidance. Next I would seek educator review, evaluate usability with appropriate consent, and measure delayed retention before making any learning-outcome claim.
 
 **Required disclosure:** I used OpenAI Codex for product ideation, implementation assistance, copy refinement, and test generation, and OpenAI image generation for the original social-preview illustration and derived favicon. When configured, the Tutor Copilot calls the OpenAI Responses API to refine tutor-facing Socratic language; the API never authors or scores learner-facing arithmetic, requests `store: false`, and has a verified local fallback. Open-source software and licenses are listed in `THIRD_PARTY.md`; the primary components are React/React DOM, Vinext, Vite, Cloudflare tooling, TypeScript, and ESLint under MIT and/or Apache-2.0 licenses. I used no real student data, personal information, biometric identification, or third-party copyrighted media.
 
@@ -14,7 +14,7 @@ I built it with React and TypeScript as a responsive Cloudflare Worker applicati
 
 ### 0:00–0:18 — Hook
 
-> Most math apps learn only when a child is right. Moonbase 10 learns from the mistake. It is an adaptive K–5 math adventure where every answer changes what happens next.
+> Can a learner use a strategy after the hint is gone? Moonbase 10 turns a mistake into a visual bridge, then checks the strategy with different numbers.
 
 Show the Mission 04 screen. Keep the array and ORBIT panel visible.
 
@@ -24,9 +24,9 @@ Show the Mission 04 screen. Keep the array and ORBIT panel visible.
 
 Choose **20**.
 
-> ORBIT does not say “try again.” It classifies the reasoning pattern: the final equal group was dropped. It holds the learning goal steady and changes the size of the leap.
+> ORBIT treats this as a possible missing-group pattern and chooses a smaller visual step. That is a hypothesis for the tutor to check.
 
-### 0:48–1:22 — Show the adaptation loop
+### 0:48–1:15 — Show the adaptation loop
 
 Open the learning detour.
 
@@ -36,7 +36,13 @@ Choose **12**, then choose **24** on the restored full mission.
 
 > Support fades immediately, Nova retries the original problem, and ORBIT labels the success as scaffolded rather than independent. Productive struggle earns progress instead of a penalty.
 
-### 1:22–2:15 — Show Human + AI supervision
+### 1:15–1:45 — Check the strategy
+
+Choose **35** on the new-number challenge: five trays of seven seedlings.
+
+> Recovering six times four could mean remembering the answer. Here, Nova applies the strategy to a different problem. The map records this first attempt separately. Repeating either question cannot add fresh mastery or rewards. This is immediate transfer evidence, not a claim of lasting learning.
+
+### 1:45–2:25 — Show Human + AI supervision
 
 Open **Learning map**.
 
@@ -44,13 +50,13 @@ Open **Learning map**.
 
 Choose **Transfer**, then **Create tutor co-plan**.
 
-> OpenAI can refine the tutoring language through a strict schema, but it never controls the math. Every mission is authored and tested, unsafe output falls back locally, and nothing reaches Nova until a tutor approves it.
+> The source label tells us how this plan was made. The verified engine works now; an optional OpenAI integration can refine the tutor language when configured. The learner questions stay authored and tested. A human approves the changed route.
 
 Approve the plan and launch the tutor-approved mission.
 
-### 2:15–2:42 — Establish rigor and fit
+### 2:25–2:42 — Establish rigor and fit
 
-> Twelve working mission variants cover four foundational skills. The AI layer sends no learner name, cannot leak an answer into the mission, and the full experience works without an API key. This is Live plus AI as a product loop: evidence, recommendation, human judgment, then action.
+> Twelve missions and twelve new-number checks cover four foundational skills. The prototype makes its assumptions visible and uses fictional demo data. Tutor decisions connect directly to the learner's next activity.
 
 ### 2:42–2:55 — Close
 
@@ -63,7 +69,8 @@ End on the Learning Map or return to the hero.
 - Reset the demo before recording.
 - Record at 1440 × 900 or 1920 × 1080 with browser zoom at 90–100%.
 - Keep the pointer slow and deliberate; do not show private tabs, notifications, or personal data.
-- Use the deterministic path: **20 → detour → 12 → 24 → Learning map**.
+- Use the deterministic path: **20 → detour → 12 → 24 → 35 on the new-number check → Learning map**.
+- Describe the actual source label on screen. Do not claim a live OpenAI response when the plan says ORBIT verified plan.
 - Keep the final cut under three minutes; judges are not required to watch beyond that.
 - Add captions and verify the live URL in a private window before submission.
 - Submit early enough to replace the entry if a link or video needs correction.

@@ -54,6 +54,20 @@ test("does not trust an arbitrary request host for social metadata", async () =>
   assert.match(html, /https:\/\/moonbase-10\.yashv10k\.chatgpt\.site\/og\.jpg/);
 });
 
+test("production Worker routes the tutor API to a working verified plan", async () => {
+  const { default: worker } = await import("../dist/server/index.js");
+  const response = await worker.fetch(new Request("https://moonbase.test/api/orbit-plan", {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "https://moonbase.test" },
+    body: JSON.stringify({ missionId: "solar-array-connect", targetLevel: 3, mastery: 71,
+      latestSignal: "The final equal group was dropped.", independentWins: 0, scaffoldedWins: 1, nearMisses: 1 }),
+  }), {}, { waitUntil() {} });
+  assert.equal(response.status, 200);
+  const plan = await response.json();
+  assert.equal(plan.source, "verified-engine");
+  assert.equal(plan.recommendedMissionId, "comms-transfer");
+});
+
 test("ships product metadata, research grounding, and no starter preview", async () => {
   const [page, layout, css, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),

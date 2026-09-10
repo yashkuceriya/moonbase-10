@@ -12,8 +12,10 @@ import {
   type SkillLevel,
   updateSkillLevel,
 } from "./learning-model";
-import type { TutorPlan } from "./copilot";
+import { buildVerifiedTutorPlan, type TutorPlan } from "./copilot";
 import { MISSIONS, type VisualData } from "./missions";
+import { createRequestGate, recordEvidence, type ExposureLedger } from "./evidence-policy";
+import { TRANSFER_CHECKS, checkAnswer } from "./transfer-checks";
 
 type Phase = "question" | "adaptive" | "scaffold" | "retry" | "success";
 type CopilotState = "idle" | "loading" | "ready" | "queued" | "error";
@@ -141,6 +143,10 @@ export default function Home() {
   const [copilotState, setCopilotState] = useState<CopilotState>("idle");
   const [copilotMessage, setCopilotMessage] = useState("");
   const [queuedMissionIndex, setQueuedMissionIndex] = useState<number | null>(null);
+  const [transferResults, setTransferResults] = useState<Record<string, { selected: number; correct: boolean }>>({});
+  const exposures = useRef<ExposureLedger>({});
+  const answeredChecks = useRef(new Set<string>());
+  const requestGate = useRef(createRequestGate());
   const [traceEvents, setTraceEvents] = useState([
     {
       message: "ORBIT opened with an array to connect Nova’s skip-counting to equal groups.",
@@ -150,6 +156,15 @@ export default function Home() {
   const detourButtonRef = useRef<HTMLButtonElement>(null);
 
   const mission = MISSIONS[missionIndex];
+  const transferCheck = TRANSFER_CHECKS[mission.id];
+  const transferResult = transferResults[mission.id];
+  const transferWins = Object.values(evidence).reduce((sum, skill) => sum + skill.transferWins, 0);
+  const transferAttempts = transferWins + Object.values(evidence).reduce((sum, skill) => sum + skill.transferNeedsSupport, 0);
+  const nextTeachingMove = transferResult
+    ? transferResult.correct
+      ? "Ask Nova to explain the strategy, then revisit it in a later session to check retention."
+      : "Rebuild this strategy with a representation before trying another unfamiliar problem."
+    : mission.nextMove;
   const progress = getMissionProgress(completed);
   const liveEvent = traceEvents[0].message;
   const activePrompt = phase === "scaffold" ? mission.scaffold.prompt : mission.prompt;
@@ -163,7 +178,7 @@ export default function Home() {
     if (phase === "adaptive") return "Pattern spotted — rerouting";
     if (phase === "scaffold") return "20-second learning detour";
     if (phase === "retry") return "Bridge built — try the mission again";
-    if (phase === "success") return "Evidence of mastery captured";
+    if (phase === "success") return "Ready to try new numbers?";
     return "Watching the strategy, not just the score";
   }, [phase]);
 
@@ -171,12 +186,27 @@ export default function Home() {
     if (phase === "adaptive") detourButtonRef.current?.focus();
   }, [phase]);
 
+  useEffect(() => {
+    const gate = requestGate.current;
+    return () => gate.cancel();
+  }, []);
+
   function recordEvent(message: string, detail: string) {
     setTraceEvents((current) => [{ message, detail }, ...current].slice(0, 4));
   }
 
+  function invalidateCopilot() {
+    requestGate.current.cancel();
+    setCopilotPlan(null);
+    setCopilotState("idle");
+    setCopilotMessage("");
+    setQueuedMissionIndex(null);
+  }
+
   function answer(value: number) {
     if (phase === "adaptive" || phase === "success") return;
+    if (!activeOptions.includes(value)) return;
+    invalidateCopilot();
     setAttempts((current) => current + 1);
     setSelected(value);
 
@@ -195,9 +225,18 @@ export default function Home() {
       return;
     }
 
+    const credit = recordEvidence(exposures.current, mission.id, value === mission.answer, phase === "retry");
+    exposures.current = credit.ledger;
+
     if (value === mission.answer) {
+      if (!credit.firstCompletion) {
+        setPhase("success");
+        setLastMasteryDelta(0);
+        recordEvent("Nova revisited a completed mission. This practice did not add mastery or rewards.", "Practice · previously solved item");
+        return;
+      }
       const prior = mastery[mission.skill];
-      const scaffolded = phase === "retry";
+      const scaffolded = credit.observation === "recovery";
       const updated = traceMastery(prior, true, scaffolded);
       const currentLevel = levels[mission.skill];
       const nextLevel = updateSkillLevel(currentLevel, true, scaffolded, mission.level);
@@ -216,7 +255,7 @@ export default function Home() {
       }));
       setLastMasteryDelta(updated - prior);
       recordEvent(
-        `Nova solved ${mission.skillLabel.toLowerCase()} ${scaffolded ? "after one scaffold" : "independently"}. ${scaffolded ? "Support stays at the same level until independent evidence appears." : nextLevel > currentLevel ? `ORBIT advanced this skill to ${levelName(nextLevel)}.` : `ORBIT confirmed the current ${levelName(currentLevel)} level without inflating it.`}`,
+        `Nova solved ${mission.skillLabel.toLowerCase()} ${scaffolded ? "after support or an earlier attempt" : "independently"}. ${scaffolded ? "Support stays at the same level until independent evidence appears." : nextLevel > currentLevel ? `ORBIT advanced this skill to ${levelName(nextLevel)}.` : `ORBIT confirmed the current ${levelName(currentLevel)} level without inflating it.`}`,
         `${updated - prior >= 0 ? "+" : ""}${updated - prior} evidence points · ${scaffolded ? "scaffolded" : "independent"} success`,
       );
       return;
@@ -226,20 +265,21 @@ export default function Home() {
     setMisconception(insight);
     setPhase("adaptive");
     setStreak(0);
-    setDetours((current) => current + 1);
+    const firstMiss = credit.observation === "miss";
+    if (firstMiss) setDetours((current) => current + 1);
     const prior = mastery[mission.skill];
-    const updated = traceMastery(prior, false);
+    const updated = firstMiss ? traceMastery(prior, false) : prior;
     setMastery((current) => ({ ...current, [mission.skill]: updated }));
     setEvidence((current) => ({
       ...current,
       [mission.skill]: {
         ...current[mission.skill],
-        nearMisses: current[mission.skill].nearMisses + 1,
+        nearMisses: current[mission.skill].nearMisses + (firstMiss ? 1 : 0),
       },
     }));
     setLastMasteryDelta(updated - prior);
     recordEvent(
-      `Near-miss classified: ${insight} ORBIT paused difficulty and selected a prerequisite micro-step.`,
+      `Possible reasoning pattern: ${insight} ORBIT selected a prerequisite micro-step. ${firstMiss ? "" : "Repeated attempts do not add another estimate change or reward."}`,
       `${updated - prior} evidence points · bridge recommended`,
     );
   }
@@ -251,6 +291,7 @@ export default function Home() {
   }
 
   function nextMission() {
+    invalidateCopilot();
     const nextIndex = chooseNextMissionIndex(MISSIONS, missionIndex, mastery, levels);
     const next = MISSIONS[nextIndex];
     setMissionIndex(nextIndex);
@@ -271,33 +312,38 @@ export default function Home() {
   }
 
   async function createCopilotPlan() {
+    const request = requestGate.current.begin();
     setCopilotState("loading");
     setCopilotMessage("ORBIT is turning the evidence into a tutor-reviewable plan…");
     setCopilotPlan(null);
     setQueuedMissionIndex(null);
     const skillEvidence = evidence[mission.skill];
+    const input = {
+      missionId: mission.id,
+      targetLevel: copilotLevel,
+      mastery: mastery[mission.skill],
+      latestSignal: misconception || mission.learnerRead,
+      independentWins: skillEvidence.independentWins + skillEvidence.transferWins,
+      scaffoldedWins: skillEvidence.scaffoldedWins,
+      nearMisses: skillEvidence.nearMisses + skillEvidence.transferNeedsSupport,
+    };
 
     try {
       const response = await fetch("/api/orbit-plan", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          missionId: mission.id,
-          targetLevel: copilotLevel,
-          mastery: mastery[mission.skill],
-          latestSignal: misconception || mission.learnerRead,
-          independentWins: skillEvidence.independentWins,
-          scaffoldedWins: skillEvidence.scaffoldedWins,
-          nearMisses: skillEvidence.nearMisses,
-        }),
+        body: JSON.stringify(input),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(12_000)]),
       });
       if (!response.ok) throw new Error("Copilot request failed");
 
       const plan = await response.json() as TutorPlan;
+      if (!request.isCurrent()) return;
       const recommendedIndex = MISSIONS.findIndex((candidate) => candidate.id === plan.recommendedMissionId);
       if (
         recommendedIndex < 0
         || MISSIONS[recommendedIndex].skill !== mission.skill
+        || MISSIONS[recommendedIndex].level !== copilotLevel
         || plan.safety?.mathSource !== "authored-and-tested"
         || plan.safety?.answerWithheld !== true
         || plan.safety?.storedByMoonbase !== false
@@ -313,8 +359,10 @@ export default function Home() {
           : "ORBIT’s verified engine created this plan without requiring an external model or learner-data storage.",
       );
     } catch {
-      setCopilotState("error");
-      setCopilotMessage("ORBIT could not create a plan right now. The learner route is unchanged.");
+      if (!request.isCurrent()) return;
+      setCopilotPlan(buildVerifiedTutorPlan(input));
+      setCopilotState("ready");
+      setCopilotMessage("The connection was unavailable. ORBIT prepared its local coaching plan for you to review.");
     }
   }
 
@@ -335,6 +383,7 @@ export default function Home() {
 
   function continueFromMap() {
     if (queuedMissionIndex !== null) {
+      requestGate.current.cancel();
       const approved = MISSIONS[queuedMissionIndex];
       setMissionIndex(queuedMissionIndex);
       setPhase("question");
@@ -357,6 +406,31 @@ export default function Home() {
     setView("mission");
   }
 
+  function answerTransfer(value: number) {
+    if (phase !== "success" || !transferCheck?.options.includes(value) || answeredChecks.current.has(mission.id)) return;
+    answeredChecks.current.add(mission.id);
+    invalidateCopilot();
+    const correct = value === checkAnswer(transferCheck);
+    const updated = traceMastery(mastery[mission.skill], correct);
+    setTransferResults((current) => ({ ...current, [mission.id]: { selected: value, correct } }));
+    setAttempts((current) => current + 1);
+    setLastMasteryDelta(updated - mastery[mission.skill]);
+    setMastery((current) => ({ ...current, [mission.skill]: updated }));
+    setLevels((current) => ({ ...current, [mission.skill]: updateSkillLevel(current[mission.skill], correct, false, mission.level) }));
+    setEvidence((current) => ({ ...current, [mission.skill]: {
+      ...current[mission.skill],
+      transferWins: current[mission.skill].transferWins + (correct ? 1 : 0),
+      transferNeedsSupport: current[mission.skill].transferNeedsSupport + (correct ? 0 : 1),
+    } }));
+    setMisconception(correct
+      ? "Nova applied the strategy to a different problem without a worked example. This is immediate transfer evidence; retention still needs a later check."
+      : "Nova solved the original problem, but the strategy needs more support with different numbers.");
+    recordEvent(correct
+      ? "Nova solved a new-number check on the first attempt without a worked example."
+      : "The new-number check needs support. ORBIT kept the result separate from the recovered mission.",
+    `${mission.skillLabel} · immediate transfer ${correct ? "passed" : "needs support"}`);
+  }
+
   async function copyTutorBrief() {
     setCopilotMessage("");
     const brief = buildTutorBrief({
@@ -367,7 +441,7 @@ export default function Home() {
       completed,
       detours,
       latestSignal: misconception || mission.learnerRead,
-      nextMove: mission.nextMove,
+      nextMove: nextTeachingMove,
     });
 
     try {
@@ -379,6 +453,10 @@ export default function Home() {
   }
 
   function resetDemo() {
+    invalidateCopilot();
+    exposures.current = {};
+    answeredChecks.current.clear();
+    setTransferResults({});
     setView("mission");
     setMissionIndex(0);
     setPhase("question");
@@ -489,11 +567,32 @@ export default function Home() {
                 {phase === "success" && (
                   <div className="success-banner">
                     <span className="success-icon">✓</span>
-                    <div><strong>System restored!</strong><p>{mission.celebration}</p></div>
+                    <div><strong>{progress.basePower === 100 ? "Moonbase is online!" : "Mission complete!"}</strong><p>{mission.celebration}</p></div>
                     <button onClick={nextMission}>Next mission <span>→</span></button>
                   </div>
                 )}
               </div>
+
+              {phase === "success" && transferCheck && (
+                <section className="transfer-check" aria-labelledby="transfer-title">
+                  <div className="transfer-heading"><span>TRY YOUR STRATEGY</span><small>{transferResult ? "First attempt recorded" : "New numbers · optional challenge"}</small></div>
+                  <h3 id="transfer-title">Can you use the same idea here?</h3>
+                  <p>{transferCheck.prompt}</p>
+                  <div className="transfer-options" role="group" aria-label="New-number check answers">
+                    {transferCheck.options.map((option) => (
+                      <button key={option} onClick={() => answerTransfer(option)} disabled={Boolean(transferResult)}
+                        className={transferResult && option === checkAnswer(transferCheck) ? "check-correct" : transferResult?.selected === option ? "check-retry" : ""}
+                        aria-label={`Check answer ${option}`}>
+                        {option}{transferResult && option === checkAnswer(transferCheck) && <span aria-label="correct answer"> ✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="transfer-feedback" aria-live="polite">
+                    {transferResult ? <><strong>{transferResult.correct ? "Your strategy traveled!" : "Let’s build this idea a little more."}</strong><p>{transferCheck.explanation}</p><small>{transferResult.correct ? "First-try success with different numbers is recorded in your learning map." : "This check stays separate from the mission you completed. A tutor can help with the next step."}</small></>
+                      : <small>Try it without the worked example. You can also continue to your next mission.</small>}
+                  </div>
+                </section>
+              )}
             </article>
 
             <aside className={`orbit-panel orbit-panel--${phase}`}>
@@ -509,7 +608,7 @@ export default function Home() {
                   <div className="route-change"><span>Route changed</span><strong>Same goal, smaller leap</strong></div>
                   <p className="nudge-copy">{mission.nudge}</p>
                   <button ref={detourButtonRef} className="primary-action" onClick={openDetour}>Open the learning detour <span>→</span></button>
-                  <small>No penalty. Productive struggle earns 60 moon dust.</small>
+                  <small>No points lost. Your first detour on each mission earns 60 moon dust.</small>
                 </div>
               ) : phase === "scaffold" || phase === "retry" ? (
                 <div className="coach-card">
@@ -548,7 +647,8 @@ export default function Home() {
             <div>
               <span className="map-kicker"><i /> LIVE LEARNING MODEL</span>
               <h1>Nova’s learning map</h1>
-              <p>Not a report card. A living picture of what Nova understands, where a representation helps, and what should happen next.</p>
+              <p>See which strategies Nova can use with new numbers and where another representation may help.</p>
+              <p className="demo-context">Fictional demo learner. Starting estimates and base progress are sample values; evidence below comes from this session.</p>
             </div>
             <div className="session-summary">
               <span><strong>{attempts}</strong><small>attempts</small></span>
@@ -563,10 +663,11 @@ export default function Home() {
               <blockquote>“{misconception || mission.learnerRead}”</blockquote>
               <div className="next-move">
                 <span>NEXT BEST MOVE</span>
-                <p>{mission.nextMove}</p>
+                <p>{nextTeachingMove}</p>
                 <div className="move-meta"><span>Why: {mission.nextMoveWhy}</span><span>When: next mission</span><span>Policy: prototype</span></div>
               </div>
             </article>
+
 
             <article className="insight-card mastery-card">
               <div className="card-title"><div><span>SKILL CONSTELLATION</span><h2>Evidence by skill</h2></div><span className={lastMasteryDelta < 0 ? "trend-down" : "trend-up"}>{lastMasteryDelta === 0 ? "No new evidence" : `${lastMasteryDelta > 0 ? "+" : ""}${lastMasteryDelta}`}</span></div>
@@ -575,6 +676,13 @@ export default function Home() {
               <SkillMeter label="Fractions of sets" value={mastery.fractions} tone="orange" level={`${levelName(levels.fractions)} ${levels.fractions}/3`} evidence={`${evidence.fractions.independentWins} independent · ${evidence.fractions.scaffoldedWins} scaffolded`} />
               <SkillMeter label="Subtracting across ten" value={mastery.subtraction} tone="blue" level={`${levelName(levels.subtraction)} ${levels.subtraction}/3`} evidence={`${evidence.subtraction.independentWins} independent · ${evidence.subtraction.scaffoldedWins} scaffolded`} />
               <p className="meter-note"><i /> BKT-inspired prototype estimate with hand-set, uncalibrated parameters. Independent success advances Build → Connect → Transfer; scaffolded success holds the level.</p>
+            </article>
+
+            <article className="insight-card transfer-evidence">
+              <div className="card-title"><div><span>BEYOND THE PRACTICED ANSWER</span><h2>Did the strategy travel?</h2></div><strong className="transfer-total">{transferWins}/{transferAttempts}</strong></div>
+              <p>{transferAttempts ? `${transferWins} of ${transferAttempts} new-number checks were solved on the first try without a worked example.` : "Complete a mission, then try its new-number check. Results appear here after the first attempt."}</p>
+              {Object.entries(transferResults).map(([id, result]) => <div className="transfer-evidence-row" key={id}><span>{MISSIONS.find((item) => item.id === id)?.title}</span><strong>{result.correct ? "Strategy applied" : "Needs support"}</strong></div>)}
+              <small>Immediate transfer is a useful signal. It does not establish long-term retention. Repeated questions do not add fresh mastery credit.</small>
             </article>
 
             <article className="insight-card evidence-timeline">
@@ -598,7 +706,7 @@ export default function Home() {
               <fieldset className="level-picker">
                 <legend>Choose the next representation</legend>
                 {([1, 2, 3] as SkillLevel[]).map((level) => (
-                  <button key={level} type="button" aria-pressed={copilotLevel === level} onClick={() => { setCopilotLevel(level); setCopilotPlan(null); setCopilotState("idle"); setCopilotMessage(""); setQueuedMissionIndex(null); }}>
+                  <button key={level} type="button" aria-pressed={copilotLevel === level} onClick={() => { invalidateCopilot(); setCopilotLevel(level); }}>
                     <strong>{levelName(level)}</strong><small>{level === 1 ? "More structure" : level === 2 ? "Connect models" : "Test transfer"}</small>
                   </button>
                 ))}
