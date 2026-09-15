@@ -2,7 +2,7 @@
 
 ## What did you build?
 
-Moonbase 10 is an adaptive K–5 math adventure where every mistake maps the learner’s next mission. Instead of simply marking an answer wrong, ORBIT interprets the selected distractor, identifies a likely misconception, applies a BKT-inspired evidence update, and reroutes the learner into a short visual bridge. The learner then returns to the same goal with just enough support to succeed.
+Moonbase 10 is an adaptive elementary math adventure where every mistake maps the learner’s next mission. Instead of simply marking an answer wrong, ORBIT treats the selected distractor as a provisional clue, applies a BKT-inspired evidence update, and reroutes the learner into a short visual bridge. Across all three equal-group missions, nine wrong-answer paths select interactive bridges: count equal groups, restore missing rows, or remove an extra row. The learner changes the representation before answering, then returns to the original goal. The other nine missions use skill-specific authored visual bridges. This is a focused foundational-skills prototype, not a complete K–5 curriculum.
 
 The working prototype includes 12 authored missions and 12 separate new-number checks for equal groups, regrouping, fractions of sets, and subtraction across ten. The learner recovers the original problem, then can test the same strategy in a different context. First-attempt transfer and scaffolded recovery are recorded separately; replay cannot earn fresh mastery or rewards. A Learning Map explains each decision. ORBIT Tutor Copilot proposes a Socratic plan and lets a human choose and approve the next mission.
 
@@ -24,15 +24,15 @@ Show the Mission 04 screen. Keep the array and ORBIT panel visible.
 
 Choose **20**.
 
-> ORBIT treats this as a possible missing-group pattern and chooses a smaller visual step. That is a hypothesis for the tutor to check.
+> Twenty matches five rows of four. ORBIT treats that as a clue, not a diagnosis, and selects a missing-row bridge. Choosing ten would instead rebuild the meaning of equal groups; twenty-eight would remove an extra row.
 
 ### 0:48–1:15 — Show the adaptation loop
 
 Open the learning detour.
 
-> The next twenty seconds become a smaller, visual bridge: three rows of four, connected to repeated addition.
+> Nova restores the sixth row. The answer choices unlock only after the representation is repaired. The bridge asks how many cells were added, not for the original answer.
 
-Choose **12**, then choose **24** on the restored full mission.
+Switch on **row 6**, choose **4**, then choose **24** on the restored full mission.
 
 > Support fades immediately, Nova retries the original problem, and ORBIT labels the success as scaffolded rather than independent. Productive struggle earns progress instead of a penalty.
 
@@ -69,7 +69,7 @@ End on the Learning Map or return to the hero.
 - Reset the demo before recording.
 - Record at 1440 × 900 or 1920 × 1080 with browser zoom at 90–100%.
 - Keep the pointer slow and deliberate; do not show private tabs, notifications, or personal data.
-- Use the deterministic path: **20 → detour → 12 → 24 → 35 on the new-number check → Learning map**.
+- Use the deterministic path: **20 → detour → switch on row 6 → 4 → 24 → 35 on the new-number check → Learning map**.
 - Describe the actual source label on screen. Do not claim a live OpenAI response when the plan says ORBIT verified plan.
 - Keep the final cut under three minutes; judges are not required to watch beyond that.
 - Add captions and verify the live URL in a private window before submission.

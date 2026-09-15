@@ -16,6 +16,7 @@ import { buildVerifiedTutorPlan, type TutorPlan } from "./copilot";
 import { MISSIONS, type VisualData } from "./missions";
 import { createRequestGate, recordEvidence, type ExposureLedger } from "./evidence-policy";
 import { TRANSFER_CHECKS, checkAnswer } from "./transfer-checks";
+import { bridgeIsReady, selectLearningBridge, toggleBridgeRow } from "./array-bridges";
 
 type Phase = "question" | "adaptive" | "scaffold" | "retry" | "success";
 type CopilotState = "idle" | "loading" | "ready" | "queued" | "error";
@@ -128,6 +129,8 @@ export default function Home() {
   const [phase, setPhase] = useState<Phase>("question");
   const [selected, setSelected] = useState<number | null>(null);
   const [misconception, setMisconception] = useState("");
+  const [bridgeAnswer, setBridgeAnswer] = useState<number | null>(null);
+  const [bridgeRows, setBridgeRows] = useState<number[]>([]);
   const [scaffoldMessage, setScaffoldMessage] = useState("");
   const [completed, setCompleted] = useState(0);
   const [streak, setStreak] = useState(2);
@@ -154,8 +157,12 @@ export default function Home() {
     },
   ]);
   const detourButtonRef = useRef<HTMLButtonElement>(null);
+  const challengeHeadingRef = useRef<HTMLHeadingElement>(null);
+  const transferHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const mission = MISSIONS[missionIndex];
+  const bridge = selectLearningBridge(mission, bridgeAnswer);
+  const activityReady = !bridge.activity || bridgeIsReady(bridge.activity, bridgeRows);
   const transferCheck = TRANSFER_CHECKS[mission.id];
   const transferResult = transferResults[mission.id];
   const transferWins = Object.values(evidence).reduce((sum, skill) => sum + skill.transferWins, 0);
@@ -167,10 +174,10 @@ export default function Home() {
     : mission.nextMove;
   const progress = getMissionProgress(completed);
   const liveEvent = traceEvents[0].message;
-  const activePrompt = phase === "scaffold" ? mission.scaffold.prompt : mission.prompt;
-  const activeEquation = phase === "scaffold" ? mission.scaffold.equation : mission.equation;
-  const activeOptions = phase === "scaffold" ? mission.scaffold.options : mission.options;
-  const activeVisual = phase === "scaffold" ? mission.scaffold.visual : mission.visual;
+  const activePrompt = phase === "scaffold" ? bridge.prompt : mission.prompt;
+  const activeEquation = phase === "scaffold" ? bridge.equation : mission.equation;
+  const activeOptions = phase === "scaffold" ? bridge.options : mission.options;
+  const activeVisual = phase === "scaffold" ? bridge.visual : mission.visual;
   const copilotMission = copilotPlan ? MISSIONS.find((candidate) => candidate.id === copilotPlan.recommendedMissionId) : null;
   const levelName = (level: number) => ["", "Build", "Connect", "Transfer"][level];
 
@@ -184,7 +191,9 @@ export default function Home() {
 
   useEffect(() => {
     if (phase === "adaptive") detourButtonRef.current?.focus();
-  }, [phase]);
+    else if (view === "mission" && (phase === "scaffold" || phase === "retry")) challengeHeadingRef.current?.focus();
+    else if (view === "mission" && phase === "success") transferHeadingRef.current?.focus();
+  }, [phase, view]);
 
   useEffect(() => {
     const gate = requestGate.current;
@@ -205,22 +214,23 @@ export default function Home() {
 
   function answer(value: number) {
     if (phase === "adaptive" || phase === "success") return;
+    if (phase === "scaffold" && !activityReady) return;
     if (!activeOptions.includes(value)) return;
     invalidateCopilot();
     setAttempts((current) => current + 1);
     setSelected(value);
 
     if (phase === "scaffold") {
-      if (value === mission.scaffold.answer) {
-        setScaffoldMessage(mission.scaffold.coach);
+      if (value === bridge.answer) {
+        setScaffoldMessage(bridge.coach);
         setPhase("retry");
         setSelected(null);
         recordEvent(
-          `Nova completed a smaller ${mission.skillLabel.toLowerCase()} step. ORBIT restored the original challenge with one visual bridge.`,
+          `Nova completed “${bridge.title}”. ORBIT restored the original challenge. This supported step is not independent mastery evidence.`,
           "Bridge completed · original goal restored",
         );
       } else {
-        setScaffoldMessage(mission.scaffold.wrongFeedback);
+        setScaffoldMessage(bridge.wrongFeedback);
       }
       return;
     }
@@ -261,8 +271,11 @@ export default function Home() {
       return;
     }
 
-    const insight = mission.insightByAnswer[value] ?? mission.defaultInsight;
+    const selectedBridge = selectLearningBridge(mission, value);
+    const insight = `An answer of ${value} is a clue, not a diagnosis. ${selectedBridge.reason}`;
     setMisconception(insight);
+    setBridgeAnswer(value);
+    setBridgeRows(selectedBridge.activity?.initialRows ?? []);
     setPhase("adaptive");
     setStreak(0);
     const firstMiss = credit.observation === "miss";
@@ -279,7 +292,7 @@ export default function Home() {
     }));
     setLastMasteryDelta(updated - prior);
     recordEvent(
-      `Possible reasoning pattern: ${insight} ORBIT selected a prerequisite micro-step. ${firstMiss ? "" : "Repeated attempts do not add another estimate change or reward."}`,
+      `${insight} Selected bridge: ${selectedBridge.title}. ${firstMiss ? "" : "Repeated attempts do not add another estimate change or reward."}`,
       `${updated - prior} evidence points · bridge recommended`,
     );
   }
@@ -295,6 +308,8 @@ export default function Home() {
     const nextIndex = chooseNextMissionIndex(MISSIONS, missionIndex, mastery, levels);
     const next = MISSIONS[nextIndex];
     setMissionIndex(nextIndex);
+    setBridgeAnswer(null);
+    setBridgeRows([]);
     setPhase("question");
     setSelected(null);
     setMisconception("");
@@ -386,6 +401,8 @@ export default function Home() {
       requestGate.current.cancel();
       const approved = MISSIONS[queuedMissionIndex];
       setMissionIndex(queuedMissionIndex);
+      setBridgeAnswer(null);
+      setBridgeRows([]);
       setPhase("question");
       setSelected(null);
       setMisconception("");
@@ -459,6 +476,8 @@ export default function Home() {
     setTransferResults({});
     setView("mission");
     setMissionIndex(0);
+    setBridgeAnswer(null);
+    setBridgeRows([]);
     setPhase("question");
     setSelected(null);
     setMisconception("");
@@ -527,29 +546,50 @@ export default function Home() {
           <section className="game-layout">
             <article className={`challenge-card phase-${phase}`}>
               <div className="challenge-heading">
-                <div><span className="step-kicker">YOUR NEXT MOVE</span><h2>{activePrompt}</h2></div>
+                <div><span className="step-kicker">YOUR NEXT MOVE</span><h2 ref={challengeHeadingRef} tabIndex={-1}>{activePrompt}</h2></div>
                 <div className="challenge-tags"><span className="level-chip">{mission.levelLabel} {mission.level}/3</span><span className="skill-chip">{mission.skillLabel}</span></div>
               </div>
 
               <div className="problem-stage">
-                <MissionVisual visual={activeVisual} />
+                {phase === "scaffold" && bridge.activity ? (
+                  <div className="bridge-workbench">
+                    <p id="bridge-instruction">{bridge.activity.instruction}</p>
+                    <div className="bridge-rows" role="group" aria-label="Interactive equal groups" aria-describedby="bridge-instruction">
+                      {Array.from({ length: bridge.activity.rows }, (_, row) => (
+                        <button key={row} type="button" aria-pressed={bridgeRows.includes(row)}
+                          aria-label={`${bridge.activity?.mode === "count" ? "Count" : "Toggle"} row ${row + 1}`}
+                          onClick={() => {
+                            const activity = bridge.activity;
+                            if (activity) setBridgeRows((current) => toggleBridgeRow(activity, current, row));
+                            setSelected(null);
+                            setScaffoldMessage("");
+                          }}>
+                          <span className="bridge-row-label">Row {row + 1}</span>
+                          <span className="bridge-row-cells" aria-hidden="true">{Array.from({ length: bridge.activity?.columns ?? 0 }, (_, cell) => <i key={cell} />)}</span>
+                          <span className="bridge-row-state">{bridgeRows.includes(row) ? (bridge.activity?.mode === "count" ? "Counted ✓" : "On ✓") : (bridge.activity?.mode === "count" ? "Count" : "Off")}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="bridge-status" role="status">{activityReady ? "Rows checked. Now choose the number of cells below." : `${bridgeRows.length} ${bridge.activity.mode === "count" ? "rows marked" : "rows on"} · complete the row task to unlock the answers.`}</p>
+                  </div>
+                ) : <MissionVisual visual={activeVisual} />}
                 <div className="equation-card">
                   <small>{phase === "scaffold" ? "BRIDGE STEP" : "MISSION MATH"}</small>
                   <strong>{activeEquation}</strong>
-                  {phase === "retry" && <span className="bridge-note">Bridge unlocked: {mission.scaffold.equation}</span>}
+                  {phase === "retry" && <span className="bridge-note">Bridge unlocked: {bridge.equation}</span>}
                 </div>
               </div>
 
               <div className="answer-grid" aria-label="Answer choices">
                 {activeOptions.map((option) => {
                   const isSelected = selected === option;
-                  const isCorrect = (phase === "success" && option === mission.answer) || (phase === "scaffold" && isSelected && option === mission.scaffold.answer);
+                  const isCorrect = (phase === "success" && option === mission.answer) || (phase === "scaffold" && isSelected && option === bridge.answer);
                   const isWrong = isSelected && !isCorrect;
                   return (
                     <button
                       key={option}
                       onClick={() => answer(option)}
-                      disabled={phase === "adaptive" || phase === "success"}
+                      disabled={phase === "adaptive" || phase === "success" || (phase === "scaffold" && !activityReady)}
                       className={`${isSelected ? "selected" : ""} ${isCorrect ? "correct" : ""} ${isWrong ? "wrong" : ""}`}
                       aria-label={`Answer ${option}`}
                     >
@@ -576,7 +616,7 @@ export default function Home() {
               {phase === "success" && transferCheck && (
                 <section className="transfer-check" aria-labelledby="transfer-title">
                   <div className="transfer-heading"><span>TRY YOUR STRATEGY</span><small>{transferResult ? "First attempt recorded" : "New numbers · optional challenge"}</small></div>
-                  <h3 id="transfer-title">Can you use the same idea here?</h3>
+                  <h3 id="transfer-title" ref={transferHeadingRef} tabIndex={-1}>Can you use the same idea here?</h3>
                   <p>{transferCheck.prompt}</p>
                   <div className="transfer-options" role="group" aria-label="New-number check answers">
                     {transferCheck.options.map((option) => (
@@ -605,17 +645,17 @@ export default function Home() {
                 <div className="adaptation-card">
                   <span className="signal-tag">LEARNING SIGNAL</span>
                   <p>{misconception}</p>
-                  <div className="route-change"><span>Route changed</span><strong>Same goal, smaller leap</strong></div>
-                  <p className="nudge-copy">{mission.nudge}</p>
+                  <div className="route-change"><span>Route changed</span><strong>{bridge.title}</strong></div>
+                  <p className="nudge-copy">{bridge.activity?.instruction ?? mission.nudge}</p>
                   <button ref={detourButtonRef} className="primary-action" onClick={openDetour}>Open the learning detour <span>→</span></button>
                   <small>No points lost. Your first detour on each mission earns 60 moon dust.</small>
                 </div>
               ) : phase === "scaffold" || phase === "retry" ? (
                 <div className="coach-card">
                   <span className="signal-tag">WHY THIS STEP</span>
-                  <p>{mission.scaffold.coach}</p>
+                  <p>{bridge.coach}</p>
                   <div className="thinking-path"><span className="done">Notice</span><i /><span className={phase === "retry" ? "done" : "active"}>Build</span><i /><span className={phase === "retry" ? "active" : ""}>Connect</span></div>
-                  <small>ORBIT will fade this support as soon as the pattern is stable.</small>
+                  <small>This is supported practice. A separate new-number check will test the strategy without this bridge.</small>
                 </div>
               ) : phase === "success" ? (
                 <div className="evidence-card">

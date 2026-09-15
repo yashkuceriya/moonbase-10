@@ -366,6 +366,18 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outlin
 .transfer-evidence-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); font-size: .875rem; }
 .transfer-evidence-row strong { color: #51448a; }
 .transfer-evidence > small { margin-top: 12px; }
+.bridge-workbench { min-width: 0; padding: 12px 0; }
+.bridge-workbench > p { font-size: .875rem; line-height: 1.5; }
+.bridge-rows { display: grid; gap: 7px; margin: 14px 0; }
+.bridge-rows button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 9px; border: 1px solid #b8b4c7; border-radius: 10px; background: #f0edf5; color: #413958; cursor: pointer; }
+.bridge-rows button[aria-pressed="true"] { background: #edf5cb; border-color: #6f842c; }
+.bridge-row-label, .bridge-row-state { font-size: .75rem; font-weight: 750; white-space: nowrap; }
+.bridge-row-state { margin-left: auto; }
+.bridge-row-cells { display: flex; flex: 1; gap: 4px; }
+.bridge-row-cells i { width: 20px; max-width: 20px; min-width: 0; flex: 1; height: 22px; border: 1px solid #7162a6; border-radius: 3px; background: #c4b8e5; }
+.bridge-rows button[aria-pressed="false"] .bridge-row-cells { opacity: .45; }
+.bridge-status { color: #49415c; }
+.answer-grid button:disabled:not(.correct):not(.wrong) { opacity: .6; cursor: default; }
 @media (max-width: 760px) {
   .problem-stage { grid-template-columns: minmax(0, 1fr); }
   .base-ten-visual { transform: none; margin-inline: 0; gap: 8px; }

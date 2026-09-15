@@ -1,4 +1,26 @@
-# Product and challenger review · September 10, 2026
+# Product and challenger review
+
+## September 14 quality pass
+
+Implemented nine interactive array-distractor paths across Build, Connect, and Transfer. The initial answers 10, 20, and 28 now lead to counting equal groups, restoring a missing row, and removing an extra row respectively. Row tasks are reversible and bridge answers remain disabled until the representation is correct. Supported bridge actions do not earn independent mastery credit. Other skills still have authored per-mission visual bridges, not individually branched distractor paths.
+
+Corrected a place-value bridge whose wording asked for a number of tens but expected their value. Removed an incorrect fraction-distractor explanation. Changed the current learning-signal language to avoid diagnosing a reasoning pattern from one answer.
+
+Browser QA on the local preview verified:
+
+- All three initial wrong-answer routes and return to the original mission.
+- Answers locked before the row task, re-locked after undo, and unlocked after the valid representation; incorrect bridge feedback remains actionable.
+- Space/Enter keyboard activation and focus moving to the new bridge, restored question, and fresh-check headings.
+- Supported recovery remains separate from first-attempt new-number success and failure; check buttons lock after answering.
+- Learning-map evidence updates; the authored Copilot creates a reviewable plan, explicit approval queues it, and launch opens the different Transfer mission.
+- At a 390px viewport the tested learner, bridge, and map screens have no document-level horizontal overflow; bridge rows have 48px touch targets.
+- No browser console errors appeared during the tested flow.
+
+The final automated checks cover lint, TypeScript, production build, four artifact/render checks and 27 behavior/content/API tests (31 total). The September 14 dependency audit reports zero known vulnerabilities. These are engineering checks, not proof of learning efficacy, comprehensive accessibility conformance, or full device coverage.
+
+Still open: hosted OpenAI configuration is empty, so the live external-model branch has not been validated; the Site remains owner-private; no video or contest entry has been submitted. The source label must be described accurately in the recording. The three-minute script now includes the interactive missing-row task.
+
+## September 10 review (historical)
 
 ## Review basis
 

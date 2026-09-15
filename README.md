@@ -2,7 +2,7 @@
 
 **Every mistake maps the next mission.**
 
-Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hackathon Challenge. A learner restores a lunar base by solving short math missions. The ORBIT guide uses the meaning of each answer—not only whether it was right—to classify a likely misconception, update a transparent learner estimate, and select a targeted bridge activity before returning to the original goal.
+Moonbase 10 is an adaptive elementary math adventure built for the 2026 Nerdy AI Hackathon Challenge. A learner restores a lunar base by solving short math missions. ORBIT treats a selected answer as a provisional clue, updates a transparent learner estimate, and selects a visual bridge before returning to the original goal. This is a focused foundational-skills prototype, not a complete K–5 curriculum.
 
 ## Why this entry is different
 
@@ -20,9 +20,9 @@ Moonbase 10 is a K–5 adaptive math adventure built for the 2026 Nerdy AI Hacka
 
 ORBIT combines three techniques:
 
-1. A misconception graph maps semantically meaningful distractors to likely reasoning patterns, such as dropping the final equal group or failing to carry a regrouped ten.
+1. An authored routing policy treats distractors as provisional reasoning clues. All nine array distractors route to interactive counting, missing-row, or extra-row bridges. Learners must complete a reversible row task to unlock the bridge answers. The other nine missions retain their skill-specific authored visual bridges; these are not yet individually branched by distractor.
 2. A BKT-inspired Bayesian update estimates skill mastery after each observation. Its hand-set prototype parameters are explicit and not yet calibrated on learner data. After a completed mission, a deterministic policy selects the lowest-estimated skill among the other available skills at the learner’s current representation level.
-3. A supervised Tutor Copilot converts the same evidence into a three-move Socratic plan. When `OPENAI_API_KEY` is configured, server-side OpenAI Structured Outputs may refine the tutoring language. Runtime validation rejects numerical answer leakage or diagnostic claims, and the verified local plan takes over on refusal, timeout, malformed output, or missing configuration.
+3. A supervised Tutor Copilot converts the same evidence into a three-move Socratic plan. When `OPENAI_API_KEY` is configured, server-side OpenAI Structured Outputs may refine the tutoring language. Runtime validation rejects numbers and known diagnostic terms; it does not guarantee that all unsafe language is detected. Human review is still required. The authored local plan takes over on refusal, timeout, malformed output, or missing configuration.
 
 The current prototype includes 12 authored and automatically validated mission variants plus 12 separate new-number checks. Build, Connect, and Transfer missions cover equal groups, place-value regrouping, fractions of sets, and subtraction across ten. Independent success advances the representation level; scaffolded success records recovery while holding the level until independent evidence appears. Immediate transfer is recorded separately from recovery and is not evidence of long-term retention. Starting estimates and base progress belong to the explicitly labeled fictional demo profile.
 
@@ -37,8 +37,8 @@ Copy `.env.example` to `.env` and add an OpenAI API key only if you want the opt
 
 ## Demo path
 
-1. On Mission 04, choose **20**. ORBIT recognizes that the final row was dropped.
-2. Open the learning detour and choose **12** for `4 + 4 + 4`.
+1. On Mission 04, choose **20**. ORBIT observes that this matches five rows of four and proposes a missing-row bridge.
+2. Open the learning detour, switch on **row 6**, and choose **4** for the cells restored.
 3. Return to the full mission and choose **24**.
 4. Try the new-number check: five trays of seven seedlings. Choose **35**, then open **Learning map** to show recovery and immediate transfer as separate evidence.
 5. In **ORBIT Tutor Copilot**, choose **Transfer**, create the co-plan, and review the three Socratic moves.

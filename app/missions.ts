@@ -129,7 +129,7 @@ export const MISSIONS: Mission[] = [
     insightByAnswer: {
       3: "You found one fourth, but the mission needs three fourths.",
       4: "You used the denominator as the answer instead of making four equal groups.",
-      8: "You filled two groups instead of three.",
+      8: "This total does not match three equal groups of three. Check the size of one fourth first.",
     },
     defaultInsight: "The set must be split into four equal groups before taking three.",
     learnerRead: "Nova can find a unit fraction of a set and is learning to combine the requested number of equal groups.",
@@ -246,7 +246,7 @@ export const MISSIONS: Mission[] = [
     nextMove: "Repeat with a sum that creates ten ones, then trade those ones for one ten.",
     nextMoveWhy: "Prepares the regrouping exchange",
     scaffold: {
-      prompt: "Two tens plus one ten makes how many tens?",
+      prompt: "Two tens plus one ten has what value?",
       equation: "20 + 10 = ?",
       options: [3, 30, 210],
       answer: 30,
