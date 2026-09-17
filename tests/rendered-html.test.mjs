@@ -42,6 +42,9 @@ test("server-renders the Moonbase 10 learner mission", async () => {
   assert.match(html, /Connect.*2.*\/3/);
   assert.match(html, /ORBIT/);
   assert.match(html, /Every mistake maps the next mission/);
+  assert.match(html, /Return to learner mission/);
+  assert.match(html, /Fictional learner demo, not a student record/);
+  assert.doesNotMatch(html, /No account, ads, or student data collection/);
   assert.doesNotMatch(html, developmentPreviewMeta);
   assert.doesNotMatch(html, /react-loading-skeleton|Your site is taking shape/);
 });
@@ -88,6 +91,11 @@ test("ships product metadata, research grounding, and no starter preview", async
   assert.match(page, /Create tutor co-plan/);
   assert.match(page, /Approve this plan for Nova/);
   assert.match(page, /Copy evidence brief/);
+  assert.match(page, /Complete evidence brief · select to copy/);
+  assert.match(page, /Clear session and restart/);
+  assert.match(page, /Keep this session/);
+  assert.doesNotMatch(page, /window\.confirm|exposures\.current, needsRepair/);
+  assert.match(page, /Previously completed · practice only · no fresh mission credit/);
   assert.match(page, /TESTED LEARNER MISSION/);
   assert.match(page, /https:\/\/ies\.ed\.gov\/ncee\/wwc\/practiceguide\/26/);
   assert.match(layout, /generateMetadata/);

@@ -24,7 +24,7 @@ export type TutorPlan = {
   recommendedLevel: SkillLevel;
   safety: {
     mathSource: "authored-and-tested";
-    answerWithheld: true;
+    reviewRequired: true;
     storedByMoonbase: false;
   };
 };
@@ -113,16 +113,16 @@ export function buildVerifiedTutorPlan(input: CopilotInput): TutorPlan {
     source: "verified-engine",
     model: null,
     headline: `Turn the signal into a ${next.levelLabel.toLowerCase()}-level conversation`,
-    rationale: `Signal: ${input.latestSignal} The current estimate is ${input.mastery}% with ${evidenceSummary}. Keep the hypothesis provisional and test it through explanation, not another score alone.`,
+    rationale: `This skill has ${evidenceSummary} in this demo. The ${input.mastery}% prototype estimate is uncalibrated. Review the learner’s explanation before deciding the next representation.`,
     noticePrompt: prompts.notice,
     representPrompt: prompts.represent,
-    fadePrompt: `When Nova can explain the strategy, launch “${next.title}” and let the ${next.levelLabel.toLowerCase()} representation carry less of the thinking.`,
+    fadePrompt: `When Nova can explain the strategy, review “${next.title}”. ${next.level === 1 ? "Keep the concrete representation available while rebuilding the idea." : "Fade support only when the explanation shows it is no longer needed."}`,
     tutorLookFor: prompts.lookFor,
     recommendedMissionId: next.id,
     recommendedLevel: next.level,
     safety: {
       mathSource: "authored-and-tested",
-      answerWithheld: true,
+      reviewRequired: true,
       storedByMoonbase: false,
     },
   };
@@ -148,7 +148,10 @@ export function validateModelPlan(value: unknown): ModelPlan | null {
     if (normalized.length < 8 || normalized.length > 280) return null;
     if (/\p{N}/u.test(normalized)) return null;
     if (/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\b/i.test(normalized)) return null;
-    if (/\b(answer is|equals|diagnos(?:e|ed|is)|disorder|deficit)\b/i.test(normalized)) return null;
+    // Defense in depth only: passing a text filter is not a safety guarantee.
+    if (/\b(answer is|equals|diagnos\w*|disorder|deficit|dyscalculia|dyslexia|adhd|autis\w*|disabled|disability)\b/i.test(normalized)) return null;
+    if (/\b(?:choose|select|pick|click|press|mark)\b.{0,70}\b(?:option|answer|largest|smallest|highest|lowest|first|last|left|right|middle)\b/i.test(normalized)) return null;
+    if (/\b(?:correct|right)\s+(?:option|choice|answer)\b|\b(?:largest|smallest|highest|lowest|first|last|middle|leftmost|rightmost)\s+(?:option|choice|answer)\b/i.test(normalized)) return null;
     plan[key] = normalized;
   }
 

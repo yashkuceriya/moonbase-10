@@ -1,3 +1,5 @@
+import type { ExposureLedger } from "./evidence-policy.ts";
+
 export type SkillKey = "arrays" | "placeValue" | "fractions" | "subtraction";
 export type SkillLevel = 1 | 2 | 3;
 
@@ -51,30 +53,39 @@ export function traceMastery(priorPercent: number, correct: boolean, scaffolded 
 }
 
 export function chooseNextMissionIndex(
-  missions: ReadonlyArray<{ skill: SkillKey; level: SkillLevel }>,
+  missions: ReadonlyArray<{ id: string; skill: SkillKey; level: SkillLevel }>,
   currentIndex: number,
   mastery: Mastery,
   levels: SkillLevels,
+  exposures: ExposureLedger = {},
+  repairCurrentSkill = false,
 ) {
-  if (missions.length < 2) return 0;
-
-  const currentSkill = missions[currentIndex]?.skill;
-  const availableSkills = Array.from(new Set(missions.map((mission) => mission.skill)));
-  const otherSkills = availableSkills.filter((skill) => skill !== currentSkill);
-  const skillPool = otherSkills.length > 0 ? otherSkills : availableSkills;
-  const nextSkill = skillPool.reduce((best, skill) =>
-    mastery[skill] < mastery[best] ? skill : best,
-  );
-  const targetLevel = levels[nextSkill];
-  const candidates = missions
+  const current = missions[currentIndex];
+  // Filter exhausted content BEFORE ranking skills. A prior miss is still
+  // eligible; a solved item is only revisited by an explicit tutor decision.
+  let candidates = missions
     .map((mission, index) => ({ mission, index }))
-    .filter(({ mission, index }) => mission.skill === nextSkill && index !== currentIndex)
-    .sort((a, b) => {
-      const distance = Math.abs(a.mission.level - targetLevel) - Math.abs(b.mission.level - targetLevel);
-      return distance || a.mission.level - b.mission.level || a.index - b.index;
-    });
+    .filter(({ mission, index }) => index !== currentIndex && !exposures[mission.id]?.solved && mission.level <= levels[mission.skill]);
 
-  return candidates[0]?.index ?? currentIndex;
+  if (repairCurrentSkill) {
+    if (!current) return null;
+    // Independent success may already have raised the skill level. A failed
+    // fresh check must not therefore escalate to a harder representation.
+    candidates = candidates.filter(({ mission }) => mission.skill === current.skill && mission.level <= current.level);
+    candidates.sort((a, b) => a.mission.level - b.mission.level || a.index - b.index);
+  } else {
+    const otherSkills = candidates.filter(({ mission }) => mission.skill !== current?.skill);
+    if (otherSkills.length) candidates = otherSkills;
+    candidates.sort((a, b) => mastery[a.mission.skill] - mastery[b.mission.skill]
+      || b.mission.level - a.mission.level || a.index - b.index);
+  }
+
+  return candidates[0]?.index ?? null;
+}
+
+export const SESSION_MISSION_LIMIT = 5;
+export function missionRewards(completed: number) {
+  return Math.max(0, Math.min(SESSION_MISSION_LIMIT, Math.floor(completed))) * 140;
 }
 
 export function updateSkillLevel(
@@ -100,6 +111,13 @@ const LEVEL_NAMES: Record<SkillLevel, string> = {
   3: "Transfer",
 };
 
+export function describeRepresentationEvidence(observed: SkillLevel, previous: SkillLevel, next: SkillLevel, supported: boolean) {
+  const observation = `Nova solved a ${LEVEL_NAMES[observed]}-level question ${supported ? "after support or an earlier attempt" : "independently"}.`;
+  if (supported) return `${observation} Supported recovery does not unlock a harder representation.`;
+  if (next > previous) return `${observation} Unlocked the next representation: ${LEVEL_NAMES[next]}. A fresh-question check can provide additional evidence.`;
+  return `${observation} ${LEVEL_NAMES[previous]} remains unlocked; this answer does not establish ${observed < previous ? `${LEVEL_NAMES[previous]}-level proficiency` : "long-term retention"}.`;
+}
+
 export function buildTutorBrief({
   mastery,
   levels,
@@ -121,11 +139,12 @@ export function buildTutorBrief({
 }) {
   const skillRows = (Object.keys(mastery) as SkillKey[]).map((skill) => {
     const observations = evidence[skill];
-    return `- ${SKILL_NAMES[skill]}: ${mastery[skill]}% prototype estimate; ${LEVEL_NAMES[levels[skill]]} level; ${observations.independentWins} independent, ${observations.scaffoldedWins} scaffolded, ${observations.nearMisses} near-miss; new-number checks: ${observations.transferWins} passed, ${observations.transferNeedsSupport} need support`;
+    return `- ${SKILL_NAMES[skill]}: ${mastery[skill]}% prototype estimate; highest unlocked representation: ${LEVEL_NAMES[levels[skill]]}; ${observations.independentWins} independent, ${observations.scaffoldedWins} scaffolded, ${observations.nearMisses} near-miss; new-number checks: ${observations.transferWins} passed, ${observations.transferNeedsSupport} need support`;
   });
 
   return [
     "MOONBASE 10 · TUTOR BRIEF",
+    "Fictional demo · session-only evidence · unlocked representations are not proven proficiency",
     `Session: ${attempts} attempts · ${completed} missions completed · ${detours} targeted detours`,
     "",
     `Latest learning signal: ${latestSignal}`,

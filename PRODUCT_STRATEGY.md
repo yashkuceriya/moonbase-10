@@ -50,7 +50,7 @@ Implication: adaptation should change the representation and size of the leap, t
 
 1. Start with the hook: most games react to right and wrong; Moonbase reacts to the *meaning* of the answer.
 2. Choose the plausible near miss `20` on `6 × 4`.
-3. Show the misconception-specific detour, complete `3 × 4`, and retry `6 × 4`.
+3. For answer 20, restore missing row 6, answer 4 added cells, then retry `6 × 4` with 24. The other initial errors use distinct equal-group bridges.
 4. Show that scaffolded success is not mislabeled as independence.
 5. Choose **35** on the new five-trays-of-seven check, then show separate recovery and immediate-transfer evidence in the Learning Map.
 6. Ask ORBIT Tutor Copilot for a Transfer plan, review its source and safety boundary, approve it, and launch the changed learner mission.

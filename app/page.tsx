@@ -8,7 +8,10 @@ import {
   buildTutorBrief,
   chooseNextMissionIndex,
   getMissionProgress,
+  missionRewards,
+  SESSION_MISSION_LIMIT,
   traceMastery,
+  describeRepresentationEvidence,
   type SkillLevel,
   updateSkillLevel,
 } from "./learning-model";
@@ -118,13 +121,14 @@ function SkillMeter({ label, value, tone, level, evidence }: { label: string; va
     <div className="skill-meter">
       <div className="skill-meter__label"><span>{label}</span><strong>{value}%</strong></div>
       <div className="meter-track"><i className={tone} style={{ width: `${value}%` }} /></div>
-      <div className="skill-meter__evidence"><span>{level}</span><small>{evidence}</small></div>
+      <div className="skill-meter__evidence"><span>Unlocked: {level}</span><small>{evidence}</small></div>
     </div>
   );
 }
 
 export default function Home() {
   const [view, setView] = useState<"mission" | "map">("mission");
+  const [sessionNotice, setSessionNotice] = useState<"complete" | "review" | "exhausted" | null>(null);
   const [missionIndex, setMissionIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("question");
   const [selected, setSelected] = useState<number | null>(null);
@@ -141,6 +145,8 @@ export default function Home() {
   const [evidence, setEvidence] = useState(EMPTY_EVIDENCE);
   const [lastMasteryDelta, setLastMasteryDelta] = useState(0);
   const [briefStatus, setBriefStatus] = useState("");
+  const [briefVisible, setBriefVisible] = useState(false);
+  const [resetPending, setResetPending] = useState(false);
   const [copilotLevel, setCopilotLevel] = useState<SkillLevel>(3);
   const [copilotPlan, setCopilotPlan] = useState<TutorPlan | null>(null);
   const [copilotState, setCopilotState] = useState<CopilotState>("idle");
@@ -148,6 +154,7 @@ export default function Home() {
   const [queuedMissionIndex, setQueuedMissionIndex] = useState<number | null>(null);
   const [transferResults, setTransferResults] = useState<Record<string, { selected: number; correct: boolean }>>({});
   const exposures = useRef<ExposureLedger>({});
+  const [exposureSnapshot, setExposureSnapshot] = useState<ExposureLedger>({});
   const answeredChecks = useRef(new Set<string>());
   const requestGate = useRef(createRequestGate());
   const [traceEvents, setTraceEvents] = useState([
@@ -159,12 +166,18 @@ export default function Home() {
   const detourButtonRef = useRef<HTMLButtonElement>(null);
   const challengeHeadingRef = useRef<HTMLHeadingElement>(null);
   const transferHeadingRef = useRef<HTMLHeadingElement>(null);
+  const mapHeadingRef = useRef<HTMLHeadingElement>(null);
+  const didMount = useRef(false);
 
   const mission = MISSIONS[missionIndex];
   const bridge = selectLearningBridge(mission, bridgeAnswer);
   const activityReady = !bridge.activity || bridgeIsReady(bridge.activity, bridgeRows);
   const transferCheck = TRANSFER_CHECKS[mission.id];
   const transferResult = transferResults[mission.id];
+  const needsRepair = transferResult?.correct === false;
+  const sessionComplete = completed >= SESSION_MISSION_LIMIT;
+  const nextIndex = chooseNextMissionIndex(MISSIONS, missionIndex, mastery, levels, exposureSnapshot, needsRepair);
+  const nextAction = sessionComplete ? "Review session" : nextIndex === null ? "Review next steps" : needsRepair ? "Repair this strategy" : "Next mission";
   const transferWins = Object.values(evidence).reduce((sum, skill) => sum + skill.transferWins, 0);
   const transferAttempts = transferWins + Object.values(evidence).reduce((sum, skill) => sum + skill.transferNeedsSupport, 0);
   const nextTeachingMove = transferResult
@@ -172,6 +185,9 @@ export default function Home() {
       ? "Ask Nova to explain the strategy, then revisit it in a later session to check retention."
       : "Rebuild this strategy with a representation before trying another unfamiliar problem."
     : mission.nextMove;
+  const nextMoveWhy = transferResult ? transferResult.correct ? "Immediate success does not establish retention" : "The strategy did not yet transfer to new numbers" : mission.nextMoveWhy;
+  const nextMoveWhen = transferResult?.correct ? "Explain now; revisit in a later session" : sessionComplete ? "Next tutor-led session" : "Before another unfamiliar problem";
+  const tutorBrief = buildTutorBrief({ mastery, levels, evidence, attempts, completed, detours, latestSignal: misconception || mission.learnerRead, nextMove: `${nextTeachingMove} Why: ${nextMoveWhy}. When: ${nextMoveWhen}.` });
   const progress = getMissionProgress(completed);
   const liveEvent = traceEvents[0].message;
   const activePrompt = phase === "scaffold" ? bridge.prompt : mission.prompt;
@@ -179,6 +195,13 @@ export default function Home() {
   const activeOptions = phase === "scaffold" ? bridge.options : mission.options;
   const activeVisual = phase === "scaffold" ? bridge.visual : mission.visual;
   const copilotMission = copilotPlan ? MISSIONS.find((candidate) => candidate.id === copilotPlan.recommendedMissionId) : null;
+  const isPlannedReplay = Boolean(copilotMission && exposureSnapshot[copilotMission.id]?.solved);
+  const familyActivity = {
+    arrays: { title: "Find equal groups around you.", prompt: "Look at an ice tray or window grid. Ask: How could you find the total without counting each space?" },
+    fractions: { title: "Build fair shares together.", prompt: "Use a small collection of counters. Make equal groups, then ask how combining more shares changes the amount. Explain before counting." },
+    placeValue: { title: "Make a fair exchange.", prompt: "Bundle ten small objects to represent a ten. Ask how exchanging a bundle for loose objects can preserve the total." },
+    subtraction: { title: "Talk through a backward journey.", prompt: "Draw a number line together. Choose a starting point and a distance to move back. Ask how smaller jumps can cover the same distance." },
+  }[mission.skill];
   const levelName = (level: number) => ["", "Build", "Connect", "Transfer"][level];
 
   const orbitHeadline = useMemo(() => {
@@ -190,10 +213,12 @@ export default function Home() {
   }, [phase]);
 
   useEffect(() => {
-    if (phase === "adaptive") detourButtonRef.current?.focus();
-    else if (view === "mission" && (phase === "scaffold" || phase === "retry")) challengeHeadingRef.current?.focus();
-    else if (view === "mission" && phase === "success") transferHeadingRef.current?.focus();
-  }, [phase, view]);
+    if (!didMount.current) { didMount.current = true; return; }
+    if (view === "map") mapHeadingRef.current?.focus();
+    else if (phase === "adaptive") detourButtonRef.current?.focus();
+    else if (phase === "success") transferHeadingRef.current?.focus();
+    else challengeHeadingRef.current?.focus();
+  }, [phase, view, missionIndex]);
 
   useEffect(() => {
     const gate = requestGate.current;
@@ -214,6 +239,7 @@ export default function Home() {
 
   function answer(value: number) {
     if (phase === "adaptive" || phase === "success") return;
+    if (sessionComplete) return;
     if (phase === "scaffold" && !activityReady) return;
     if (!activeOptions.includes(value)) return;
     invalidateCopilot();
@@ -237,6 +263,7 @@ export default function Home() {
 
     const credit = recordEvidence(exposures.current, mission.id, value === mission.answer, phase === "retry");
     exposures.current = credit.ledger;
+    setExposureSnapshot(credit.ledger);
 
     if (value === mission.answer) {
       if (!credit.firstCompletion) {
@@ -265,7 +292,7 @@ export default function Home() {
       }));
       setLastMasteryDelta(updated - prior);
       recordEvent(
-        `Nova solved ${mission.skillLabel.toLowerCase()} ${scaffolded ? "after support or an earlier attempt" : "independently"}. ${scaffolded ? "Support stays at the same level until independent evidence appears." : nextLevel > currentLevel ? `ORBIT advanced this skill to ${levelName(nextLevel)}.` : `ORBIT confirmed the current ${levelName(currentLevel)} level without inflating it.`}`,
+        describeRepresentationEvidence(mission.level, currentLevel, nextLevel, scaffolded),
         `${updated - prior >= 0 ? "+" : ""}${updated - prior} evidence points · ${scaffolded ? "scaffolded" : "independent"} success`,
       );
       return;
@@ -305,8 +332,15 @@ export default function Home() {
 
   function nextMission() {
     invalidateCopilot();
-    const nextIndex = chooseNextMissionIndex(MISSIONS, missionIndex, mastery, levels);
+    if (sessionComplete || nextIndex === null) {
+      setSessionNotice(sessionComplete ? "complete" : needsRepair ? "review" : "exhausted");
+      setCopilotLevel(Math.max(1, mission.level - 1) as SkillLevel);
+      setView("map");
+      return;
+    }
     const next = MISSIONS[nextIndex];
+    setSessionNotice(null);
+    setView("mission");
     setMissionIndex(nextIndex);
     setBridgeAnswer(null);
     setBridgeRows([]);
@@ -321,7 +355,9 @@ export default function Home() {
     setCopilotMessage("");
     setQueuedMissionIndex(null);
     recordEvent(
-      `ORBIT selected ${next.skillLabel.toLowerCase()} at ${next.levelLabel.toLowerCase()} level because it has the lowest current estimate among the other skills.`,
+      needsRepair
+        ? `The new-number check needs support. ORBIT selected a fresh ${next.skillLabel.toLowerCase()} mission at ${next.levelLabel.toLowerCase()} level to rebuild the same strategy.`
+        : `ORBIT selected fresh ${next.skillLabel.toLowerCase()} work at ${next.levelLabel.toLowerCase()} level. Completed items were excluded before comparing skill estimates.`,
       `Next mission · ${next.title} · ${next.levelLabel} representation`,
     );
   }
@@ -360,7 +396,7 @@ export default function Home() {
         || MISSIONS[recommendedIndex].skill !== mission.skill
         || MISSIONS[recommendedIndex].level !== copilotLevel
         || plan.safety?.mathSource !== "authored-and-tested"
-        || plan.safety?.answerWithheld !== true
+        || plan.safety?.reviewRequired !== true
         || plan.safety?.storedByMoonbase !== false
       ) {
         throw new Error("Copilot returned an invalid mission");
@@ -382,7 +418,7 @@ export default function Home() {
   }
 
   function approveCopilotPlan() {
-    if (!copilotPlan) return;
+    if (!copilotPlan || sessionComplete) return;
     const approvedIndex = MISSIONS.findIndex((candidate) => candidate.id === copilotPlan.recommendedMissionId);
     if (approvedIndex < 0) return;
 
@@ -397,10 +433,11 @@ export default function Home() {
   }
 
   function continueFromMap() {
-    if (queuedMissionIndex !== null) {
+    if (queuedMissionIndex !== null && !sessionComplete) {
       requestGate.current.cancel();
       const approved = MISSIONS[queuedMissionIndex];
       setMissionIndex(queuedMissionIndex);
+      setSessionNotice(null);
       setBridgeAnswer(null);
       setBridgeRows([]);
       setPhase("question");
@@ -410,7 +447,7 @@ export default function Home() {
       setView("mission");
       recordEvent(
         `Nova’s route changed to the tutor-approved ${approved.levelLabel.toLowerCase()} mission.`,
-        `Human + AI handoff launched · ${approved.title}`,
+        `Tutor-reviewed handoff launched · ${approved.title}`,
       );
       setQueuedMissionIndex(null);
       setCopilotPlan(null);
@@ -419,7 +456,7 @@ export default function Home() {
       return;
     }
 
-    if (phase === "success") nextMission();
+    if (phase === "success" && !sessionNotice) { nextMission(); return; }
     setView("mission");
   }
 
@@ -450,31 +487,25 @@ export default function Home() {
 
   async function copyTutorBrief() {
     setCopilotMessage("");
-    const brief = buildTutorBrief({
-      mastery,
-      levels,
-      evidence,
-      attempts,
-      completed,
-      detours,
-      latestSignal: misconception || mission.learnerRead,
-      nextMove: nextTeachingMove,
-    });
+    setBriefVisible(true);
 
     try {
-      await navigator.clipboard.writeText(brief);
+      await navigator.clipboard.writeText(tutorBrief);
       setBriefStatus("Tutor brief copied. Nothing was uploaded.");
     } catch {
-      setBriefStatus("Clipboard access is unavailable in this browser.");
+      setBriefStatus("Clipboard access is unavailable. Select and copy the complete brief below.");
     }
   }
 
   function resetDemo() {
+    setResetPending(false);
     invalidateCopilot();
     exposures.current = {};
+    setExposureSnapshot({});
     answeredChecks.current.clear();
     setTransferResults({});
     setView("mission");
+    setSessionNotice(null);
     setMissionIndex(0);
     setBridgeAnswer(null);
     setBridgeRows([]);
@@ -491,6 +522,7 @@ export default function Home() {
     setEvidence(EMPTY_EVIDENCE);
     setLastMasteryDelta(0);
     setBriefStatus("");
+    setBriefVisible(false);
     setCopilotLevel(3);
     setCopilotPlan(null);
     setCopilotState("idle");
@@ -507,7 +539,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="brand" onClick={resetDemo} aria-label="Reset Moonbase 10 demo">
+        <button className="brand" onClick={() => setView("mission")} aria-label="Return to learner mission">
           <span className="brand-mark">10</span>
           <span><strong>MOONBASE 10</strong><small>adaptive math adventure</small></span>
         </button>
@@ -517,7 +549,7 @@ export default function Home() {
         </nav>
         <div className="topbar-stats">
           <span><b>{streak}</b><small>streak</small></span>
-          <span><b>{1280 + completed * 140 + detours * 60}</b><small>moon dust</small></span>
+          <span><b>{1280 + missionRewards(completed)}</b><small>moon dust</small></span>
           <span className="avatar" aria-label="Learner profile: Nova">N</span>
         </div>
       </header>
@@ -554,23 +586,25 @@ export default function Home() {
                 {phase === "scaffold" && bridge.activity ? (
                   <div className="bridge-workbench">
                     <p id="bridge-instruction">{bridge.activity.instruction}</p>
-                    <div className="bridge-rows" role="group" aria-label="Interactive equal groups" aria-describedby="bridge-instruction">
+                    <div className={`bridge-rows ${bridge.activity.mode === "compose" ? "bridge-shares" : ""}`} role="group" aria-label={bridge.activity.mode === "compose" ? "Interactive equal shares" : "Interactive equal groups"} aria-describedby="bridge-instruction">
                       {Array.from({ length: bridge.activity.rows }, (_, row) => (
                         <button key={row} type="button" aria-pressed={bridgeRows.includes(row)}
-                          aria-label={`${bridge.activity?.mode === "count" ? "Count" : "Toggle"} row ${row + 1}`}
+                          aria-label={bridge.activity?.mode === "compose" ? `Share ${row + 1}: one of ${bridge.activity.rows} equal shares, ${bridge.activity.columns} units` : `${bridge.activity?.mode === "count" ? "Count" : "Toggle"} row ${row + 1}`}
                           onClick={() => {
                             const activity = bridge.activity;
                             if (activity) setBridgeRows((current) => toggleBridgeRow(activity, current, row));
                             setSelected(null);
                             setScaffoldMessage("");
                           }}>
-                          <span className="bridge-row-label">Row {row + 1}</span>
+                          <span className="bridge-row-label">{bridge.activity?.mode === "compose" ? "Share" : "Row"} {row + 1}</span>
                           <span className="bridge-row-cells" aria-hidden="true">{Array.from({ length: bridge.activity?.columns ?? 0 }, (_, cell) => <i key={cell} />)}</span>
-                          <span className="bridge-row-state">{bridgeRows.includes(row) ? (bridge.activity?.mode === "count" ? "Counted ✓" : "On ✓") : (bridge.activity?.mode === "count" ? "Count" : "Off")}</span>
+                          <span className="bridge-row-state">{bridge.activity?.mode === "compose" ? (bridgeRows.includes(row) ? "Selected ✓" : "Select") : bridgeRows.includes(row) ? (bridge.activity?.mode === "count" ? "Counted ✓" : "On ✓") : (bridge.activity?.mode === "count" ? "Count" : "Off")}</span>
                         </button>
                       ))}
                     </div>
-                    <p className="bridge-status" role="status">{activityReady ? "Rows checked. Now choose the number of cells below." : `${bridgeRows.length} ${bridge.activity.mode === "count" ? "rows marked" : "rows on"} · complete the row task to unlock the answers.`}</p>
+                    <p className="bridge-status" role="status">{bridge.activity.mode === "compose"
+                      ? activityReady ? "Shares selected. Now count their units altogether." : `${bridgeRows.length} shares selected · select ${bridge.activity.requiredCount} to unlock the answers.`
+                      : activityReady ? "Rows checked. Now choose the number of cells below." : `${bridgeRows.length} ${bridge.activity.mode === "count" ? "rows marked" : "rows on"} · complete the row task to unlock the answers.`}</p>
                   </div>
                 ) : <MissionVisual visual={activeVisual} />}
                 <div className="equation-card">
@@ -608,7 +642,7 @@ export default function Home() {
                   <div className="success-banner">
                     <span className="success-icon">✓</span>
                     <div><strong>{progress.basePower === 100 ? "Moonbase is online!" : "Mission complete!"}</strong><p>{mission.celebration}</p></div>
-                    <button onClick={nextMission}>Next mission <span>→</span></button>
+                    <button onClick={nextMission}>{nextAction} <span>→</span></button>
                   </div>
                 )}
               </div>
@@ -629,7 +663,7 @@ export default function Home() {
                   </div>
                   <div className="transfer-feedback" aria-live="polite">
                     {transferResult ? <><strong>{transferResult.correct ? "Your strategy traveled!" : "Let’s build this idea a little more."}</strong><p>{transferCheck.explanation}</p><small>{transferResult.correct ? "First-try success with different numbers is recorded in your learning map." : "This check stays separate from the mission you completed. A tutor can help with the next step."}</small></>
-                      : <small>Try it without the worked example. You can also continue to your next mission.</small>}
+                      : <small>Try it without the worked example, or {sessionComplete ? "review your finished session" : "continue when you’re ready"}.</small>}
                   </div>
                 </section>
               )}
@@ -648,7 +682,7 @@ export default function Home() {
                   <div className="route-change"><span>Route changed</span><strong>{bridge.title}</strong></div>
                   <p className="nudge-copy">{bridge.activity?.instruction ?? mission.nudge}</p>
                   <button ref={detourButtonRef} className="primary-action" onClick={openDetour}>Open the learning detour <span>→</span></button>
-                  <small>No points lost. Your first detour on each mission earns 60 moon dust.</small>
+                  <small>No points lost. Finish a new mission to earn 140 moon dust—with or without help.</small>
                 </div>
               ) : phase === "scaffold" || phase === "retry" ? (
                 <div className="coach-card">
@@ -686,9 +720,9 @@ export default function Home() {
           <div className="map-hero">
             <div>
               <span className="map-kicker"><i /> LIVE LEARNING MODEL</span>
-              <h1>Nova’s learning map</h1>
+              <h1 ref={mapHeadingRef} tabIndex={-1}>Nova’s learning map</h1>
               <p>See which strategies Nova can use with new numbers and where another representation may help.</p>
-              <p className="demo-context">Fictional demo learner. Starting estimates and base progress are sample values; evidence below comes from this session.</p>
+              <p className="demo-context">Fictional demo learner. Starting estimates and base progress are sample values. This tab holds session evidence only until refresh or reset; copy a brief to keep it. The tutor controls demonstrate a workflow, not verified adult access.</p>
             </div>
             <div className="session-summary">
               <span><strong>{attempts}</strong><small>attempts</small></span>
@@ -697,6 +731,17 @@ export default function Home() {
             </div>
           </div>
 
+          {sessionNotice && (
+            <section className="session-notice" aria-label="Session next steps">
+              <h2>{sessionNotice === "complete" ? "This session’s five missions are finished" : sessionNotice === "review" ? "Let’s review this strategy with a tutor" : "You’ve tried the available work at this level"}</h2>
+              <p>{sessionNotice === "complete"
+                ? `Moonbase is online: five missions finished in this session, plus three sample systems restored before this demo. This is session progress, not proof of mastery. ${transferResult ? "The last fresh-number result is preserved below." : "You can still try the last mission’s fresh-number check."}`
+                : sessionNotice === "review"
+                  ? "This new-number check needs support, and there is no unplayed same-skill repair at this level. Review the evidence below; a tutor can deliberately choose practice or a different representation."
+                  : "ORBIT will not silently repeat completed questions or move you to a harder level. Review the evidence, choose a tutor-led next step, or finish here with an evidence brief."}</p>
+              {needsRepair && <p>The latest fresh-number check still needs support. Keep that result in the tutor handoff.</p>}
+            </section>
+          )}
           <div className="map-grid">
             <article className="insight-card main-insight">
               <div className="card-title"><div><span>ORBIT’S READ</span><h2>One useful insight, not a wall of data</h2></div><span className="fresh-badge">Updated now</span></div>
@@ -704,7 +749,7 @@ export default function Home() {
               <div className="next-move">
                 <span>NEXT BEST MOVE</span>
                 <p>{nextTeachingMove}</p>
-                <div className="move-meta"><span>Why: {mission.nextMoveWhy}</span><span>When: next mission</span><span>Policy: prototype</span></div>
+                <div className="move-meta"><span>Why: {nextMoveWhy}</span><span>When: {nextMoveWhen}</span><span>Policy: prototype</span></div>
               </div>
             </article>
 
@@ -715,7 +760,7 @@ export default function Home() {
               <SkillMeter label="Place value & regrouping" value={mastery.placeValue} tone="purple" level={`${levelName(levels.placeValue)} ${levels.placeValue}/3`} evidence={`${evidence.placeValue.independentWins} independent · ${evidence.placeValue.scaffoldedWins} scaffolded`} />
               <SkillMeter label="Fractions of sets" value={mastery.fractions} tone="orange" level={`${levelName(levels.fractions)} ${levels.fractions}/3`} evidence={`${evidence.fractions.independentWins} independent · ${evidence.fractions.scaffoldedWins} scaffolded`} />
               <SkillMeter label="Subtracting across ten" value={mastery.subtraction} tone="blue" level={`${levelName(levels.subtraction)} ${levels.subtraction}/3`} evidence={`${evidence.subtraction.independentWins} independent · ${evidence.subtraction.scaffoldedWins} scaffolded`} />
-              <p className="meter-note"><i /> BKT-inspired prototype estimate with hand-set, uncalibrated parameters. Independent success advances Build → Connect → Transfer; scaffolded success holds the level.</p>
+              <p className="meter-note"><i /> Levels show the highest unlocked representation, not proven proficiency. Independent success can unlock Build → Connect → Transfer; supported success does not. Percentages are hand-set, uncalibrated prototype estimates. Check fresh-question evidence below before choosing a next step.</p>
             </article>
 
             <article className="insight-card transfer-evidence">
@@ -736,12 +781,12 @@ export default function Home() {
 
             <article className="insight-card family-card">
               <div className="family-visual"><Rover /><span className="orbit-loop" /></div>
-              <div><span>TRY THIS TOGETHER</span><h2>Turn dinner into an array hunt.</h2><p>Find something arranged in equal rows—an ice tray, egg carton, or window grid. Ask: “How many without counting one by one?”</p></div>
+              <div><span>TRY THIS TOGETHER</span><h2>{familyActivity.title}</h2><p>{familyActivity.prompt}</p></div>
             </article>
 
             <article className="insight-card tutor-card">
-              <div className="card-title"><div><span>ORBIT TUTOR COPILOT</span><h2>AI proposes. A human decides what Nova sees.</h2></div><span className="privacy-badge">Human approval required</span></div>
-              <p>ORBIT turns the latest learning signal into a short Socratic plan. A tutor chooses the support level, reviews the language, and explicitly approves a tested mission before the learner route changes.</p>
+              <div className="card-title"><div><span>ORBIT TUTOR COPILOT</span><h2>Review the plan. Choose the next step.</h2></div><span className="privacy-badge">Human approval required · demo</span></div>
+              <p>Authored coaching uses the selected skill, support level, and aggregate observations. Optional AI refines its wording; it does not interpret the specific mistake or choose the math. Review the plan, approve it, then launch the next activity.</p>
 
               <fieldset className="level-picker">
                 <legend>Choose the next representation</legend>
@@ -768,26 +813,29 @@ export default function Home() {
                     <li><span>3</span><div><strong>Fade</strong><p>{copilotPlan.fadePrompt}</p></div></li>
                   </ol>
                   <div className="look-for"><span>TUTOR LOOK-FOR</span><p>{copilotPlan.tutorLookFor}</p></div>
-                  {copilotMission && <div className="approved-mission-preview"><span>TESTED LEARNER MISSION</span><strong>{copilotMission.title}</strong><p>{copilotMission.prompt}</p><small>{copilotMission.equation} · {copilotMission.levelLabel} {copilotMission.level}/3</small></div>}
-                  <div className="safety-row"><span>✓ Answer withheld</span><span>✓ Tested math</span><span>✓ Not stored by Moonbase</span></div>
-                  <button className="approve-plan" onClick={approveCopilotPlan} disabled={copilotState === "queued"}>{copilotState === "queued" ? "Approved and queued ✓" : "Approve this plan for Nova"}<span>→</span></button>
+                  {copilotMission && <div className="approved-mission-preview"><span>TESTED LEARNER MISSION</span><strong>{copilotMission.title}</strong><p>{copilotMission.prompt}</p><small>{copilotMission.equation} · {copilotMission.levelLabel} {copilotMission.level}/3</small><p className="review-caution">{isPlannedReplay ? "Previously completed · practice only · no fresh mission credit" : "Not yet completed in this session"}</p></div>}
+                  <div className="safety-row"><span>Tutor review required</span><span>Authored, tested questions</span><span>Not stored by Moonbase</span></div>
+                  <p className="review-caution">Review every prompt before using it. Text checks do not guarantee that coaching is correct or free of answer cues.</p>
+                  <button className="approve-plan" onClick={approveCopilotPlan} disabled={copilotState === "queued" || sessionComplete}>{sessionComplete ? "Session finished · plan for later review" : copilotState === "queued" ? "Approved and queued ✓" : "Approve this plan for Nova"}<span>→</span></button>
                 </div>
               )}
 
-              <small className={`copy-status ${copilotState === "error" ? "copy-status--error" : ""}`} aria-live="polite">{copilotMessage || briefStatus || "Only skill evidence—not a learner name or account—is sent when the optional AI enhancement is configured."}</small>
+              <small className={`copy-status ${copilotState === "error" ? "copy-status--error" : ""}`} aria-live="polite">{copilotMessage || briefStatus || "Creating a plan sends fictional skill evidence to this app’s server. If configured, OpenAI receives aggregate evidence and fictional coaching drafts, not real student records. Moonbase does not save plans to a database."}</small>
+              {briefVisible && <div className="brief-export"><label htmlFor="evidence-brief">Complete evidence brief · select to copy</label><textarea id="evidence-brief" readOnly value={tutorBrief} rows={12} onFocus={(event) => event.currentTarget.select()} /><small>This view updates with this session. Save your copy before refreshing.</small></div>}
             </article>
           </div>
 
           <div className="map-actions">
-            <button className="primary-action" onClick={continueFromMap}>{queuedMissionIndex !== null ? "Launch tutor-approved mission" : "Continue Nova’s mission"} <span>→</span></button>
-            <button className="reset-button" onClick={resetDemo}>Reset demo</button>
+            <button className="primary-action" onClick={continueFromMap}>{queuedMissionIndex !== null && !sessionComplete ? "Launch tutor-approved mission" : sessionNotice ? "Return to last mission" : phase === "success" ? nextAction : "Continue Nova’s mission"} <span>→</span></button>
+            <button className="reset-button" onClick={() => setResetPending(true)} aria-expanded={resetPending} aria-controls="reset-confirmation">Reset demo</button>
           </div>
+          {resetPending && <section id="reset-confirmation" className="session-notice" aria-label="Confirm demo reset"><h2>Clear this session’s evidence?</h2><p role="status">Copy an evidence brief first if you want to keep it. Only this fictional demo session will be reset.</p><button className="brief-button" onClick={() => setResetPending(false)}>Keep this session</button> <button className="brief-button" onClick={resetDemo}>Clear session and restart</button></section>}
         </section>
       )}
 
       <footer className="product-footer">
         <div><span className="footer-mark">10</span><p><strong>MOONBASE 10</strong><br />Every mistake maps the next mission.</p></div>
-        <p>Research-informed by <a href="https://ies.ed.gov/ncee/wwc/practiceguide/26" target="_blank" rel="noreferrer">IES guidance on visual representations and progress monitoring</a>. No account, ads, or student data collection.</p>
+        <p>Research-informed by <a href="https://ies.ed.gov/ncee/wwc/practiceguide/26" target="_blank" rel="noreferrer">IES guidance on visual representations and progress monitoring</a>. Fictional learner demo, not a student record. No ads. Session evidence clears on refresh; optional tutor planning processes evidence on the server.</p>
       </footer>
     </main>
   );

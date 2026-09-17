@@ -42,7 +42,7 @@ Choose **35** on the new-number challenge: five trays of seven seedlings.
 
 > Recovering six times four could mean remembering the answer. Here, Nova applies the strategy to a different problem. The map records this first attempt separately. Repeating either question cannot add fresh mastery or rewards. This is immediate transfer evidence, not a claim of lasting learning.
 
-### 1:45–2:25 — Show Human + AI supervision
+### 1:45–2:25 — Show the tutor-review workflow
 
 Open **Learning map**.
 
@@ -50,7 +50,7 @@ Open **Learning map**.
 
 Choose **Transfer**, then **Create tutor co-plan**.
 
-> The source label tells us how this plan was made. The verified engine works now; an optional OpenAI integration can refine the tutor language when configured. The learner questions stay authored and tested. A human approves the changed route.
+> The source label tells us how this plan was made. The authored engine uses the skill and aggregate evidence. Optional OpenAI refinement can improve its wording, not interpret the specific mistake or choose the math. The tutor reviews, approves, and launches the route. These shared-page controls demonstrate the workflow; they are not authenticated tutor permissions.
 
 Approve the plan and launch the tutor-approved mission.
 
@@ -67,6 +67,7 @@ End on the Learning Map or return to the hero.
 ## Recording checklist
 
 - Reset the demo before recording.
+- Use the explicit Reset demo action and confirm Clear session and restart. The logo now preserves progress.
 - Record at 1440 × 900 or 1920 × 1080 with browser zoom at 90–100%.
 - Keep the pointer slow and deliberate; do not show private tabs, notifications, or personal data.
 - Use the deterministic path: **20 → detour → switch on row 6 → 4 → 24 → 35 on the new-number check → Learning map**.

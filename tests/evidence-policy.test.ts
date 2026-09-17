@@ -121,3 +121,38 @@ test("bridge selection cannot use an invalid or correct answer as a mistake", ()
     }
   }
 });
+
+test("non-array distractors retain distinct provisional interpretations, not solution nudges", () => {
+  for (const mission of MISSIONS.filter((item) => item.skill !== "arrays")) {
+    const reasons = mission.options.filter((value) => value !== mission.answer).map((value) => selectLearningBridge(mission, value).reason);
+    assert.equal(new Set(reasons).size, reasons.length, mission.id);
+    assert.ok(reasons.every((reason) => reason !== mission.nudge));
+  }
+});
+
+test("unit-fraction errors require composing any valid subset of requested shares", () => {
+  for (const id of ["water-vault-connect", "habitat-transfer"]) {
+    const mission = MISSIONS.find((item) => item.id === id)!;
+    assert.equal(mission.visual.kind, "fraction");
+    if (mission.visual.kind !== "fraction") continue;
+    const { total, denominator, numerator } = mission.visual;
+    const bridge = selectLearningBridge(mission, total / denominator);
+    const activity = bridge.activity!;
+    assert.equal(activity.mode, "compose");
+    assert.equal(activity.rows * activity.columns, total);
+    assert.equal(bridge.answer, total / denominator * numerator);
+    assert.equal(new Set(bridge.options).size, 3);
+    for (let mask = 0; mask < 2 ** denominator; mask++) {
+      const selected = Array.from({ length: denominator }, (_, i) => i).filter((i) => mask & 2 ** i);
+      assert.equal(bridgeIsReady(activity, selected), selected.length === numerator);
+    }
+    const valid = Array.from({ length: numerator }, (_, i) => i);
+    assert.equal(bridgeIsReady(activity, valid), true);
+    assert.equal(bridgeIsReady(activity, toggleBridgeRow(activity, valid, 0)), false);
+    assert.equal(bridgeIsReady(activity, [...valid.slice(1), denominator]), false);
+    assert.equal(bridgeIsReady(activity, [...valid.slice(1), valid[1]]), false);
+    const ledger = recordEvidence({}, id, false).ledger;
+    assert.equal(recordEvidence(ledger, id, true, true).observation, "recovery");
+    assert.equal(selectLearningBridge(mission, mission.options.find((value) => value !== mission.answer && value !== total / denominator)!).activity, undefined);
+  }
+});

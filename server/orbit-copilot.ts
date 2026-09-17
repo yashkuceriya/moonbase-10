@@ -60,11 +60,12 @@ function isSameOrigin(request: Request) {
 function hasRateCapacity(request: Request) {
   const key = request.headers.get("cf-connecting-ip") ?? "local-preview";
   const now = Date.now();
-  if (requestBuckets.size > 1_000) {
+  if (requestBuckets.size >= 1_000) {
     for (const [bucketKey, bucket] of requestBuckets) {
       if (now - bucket.startedAt >= 60_000) requestBuckets.delete(bucketKey);
     }
-    if (requestBuckets.size > 1_000) requestBuckets.clear();
+    // Fail closed for new identities rather than erasing active quotas.
+    if (requestBuckets.size >= 1_000 && !requestBuckets.has(key)) return false;
   }
   const current = requestBuckets.get(key);
   if (!current || now - current.startedAt >= 60_000) {
@@ -96,7 +97,9 @@ async function requestModelPlan(
   apiKey: string,
   model: string,
   fetcher: Fetcher,
+  signal: AbortSignal,
 ) {
+  signal.throwIfAborted();
   const current = MISSIONS.find((mission) => mission.id === fallback.recommendedMissionId);
   if (!current) return null;
 
@@ -136,7 +139,7 @@ async function requestModelPlan(
         },
       },
     }),
-    signal: AbortSignal.timeout(9_000),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(9_000)]),
   });
 
   if (!response.ok) return null;
@@ -155,6 +158,7 @@ export async function handleCopilotRequest(
   env: CopilotEnv,
   fetcher: Fetcher = fetch,
 ): Promise<Response> {
+  if (request.signal.aborted) return jsonResponse({ error: "Request cancelled" }, 499);
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
@@ -219,9 +223,10 @@ export async function handleCopilotRequest(
 
   const model = env.OPENAI_MODEL?.trim() || "gpt-6-astra";
   try {
-    const modelPlan = await requestModelPlan(fallback, apiKey, model, fetcher);
+    const modelPlan = await requestModelPlan(fallback, apiKey, model, fetcher, request.signal);
     return jsonResponse(modelPlan ? mergeModelPlan(fallback, modelPlan, model) : fallback);
   } catch {
+    if (request.signal.aborted) return jsonResponse({ error: "Request cancelled" }, 499);
     return jsonResponse(fallback);
   }
 }

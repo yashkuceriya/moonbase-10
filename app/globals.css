@@ -32,9 +32,12 @@ body {
 
 button, input { font: inherit; }
 button { color: inherit; }
-button:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 3px solid #12112e; outline-offset: 3px; box-shadow: 0 0 0 6px #fffdf6; }
 
 .app-shell { min-height: 100vh; }
+.brief-export { margin-top: 20px; display: grid; gap: 10px; }
+.brief-export label { font-weight: 700; }
+.brief-export textarea { box-sizing: border-box; width: 100%; min-height: 280px; resize: vertical; padding: 14px; border: 1px solid var(--muted); border-radius: 12px; font: inherit; line-height: 1.5; background: var(--paper); color: var(--ink); }
 
 .topbar {
   height: 74px;
@@ -300,7 +303,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outlin
   .topbar-stats > span { display: none; }
   .brand small { display: none; }
   .mission-hero { min-height: 250px; padding: 28px 20px; }
-  .mission-progress { left: 20px; right: 20px; bottom: 22px; width: auto; }
+  .mission-hero::before { display: none; }
+  .mission-progress { position: relative; left: auto; right: auto; bottom: auto; width: auto; margin-top: 24px; }
   .game-layout { width: calc(100% - 24px); padding-top: 12px; margin-bottom: 30px; }
   .challenge-card, .orbit-panel, .insight-card { border-radius: 18px; }
   .challenge-card, .orbit-panel { padding: 19px; }
@@ -377,6 +381,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outlin
 .bridge-row-cells i { width: 20px; max-width: 20px; min-width: 0; flex: 1; height: 22px; border: 1px solid #7162a6; border-radius: 3px; background: #c4b8e5; }
 .bridge-rows button[aria-pressed="false"] .bridge-row-cells { opacity: .45; }
 .bridge-status { color: #49415c; }
+.bridge-shares .bridge-row-cells i { background: #9ad8ed; border-color: #267b98; border-radius: 3px 3px 8px 8px; }
+.session-notice { padding: 24px; margin: 0 0 24px; background: #edf5cb; border: 1px solid #758b30; border-radius: 18px; }
+.session-notice h2 { margin: 0 0 12px; font-size: 1.4rem; }
+.session-notice p { line-height: 1.55; margin: 8px 0; }
+.review-caution { color: #e0d9f5; font-size: .875rem; line-height: 1.55; }
 .answer-grid button:disabled:not(.correct):not(.wrong) { opacity: .6; cursor: default; }
 @media (max-width: 760px) {
   .problem-stage { grid-template-columns: minmax(0, 1fr); }

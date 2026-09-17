@@ -1,5 +1,28 @@
 # Product and challenger review
 
+## September 17 release repair
+
+The September 16 review found that the uncommitted candidate's tests/build passed but lint and TypeScript failed. Both are now fixed without relaxing checks: render-time routing uses a state ledger snapshot, while event-time duplicate protection retains its ref; the route-exhaustion test has explicit typing.
+
+Other corrections in this release:
+
+- Normal routing excludes completed content; failed fresh checks select same-skill repair at no harder than the observed representation or request tutor review. Five unique completions end the session, preserving the final optional check. Supported and independent completions earn equal rewards.
+- Multi-share fraction mistakes have reversible composition activities; other non-array distractor interpretations remain distinct and provisional.
+- Lower-level repair no longer claims to confirm higher-level proficiency. Map and exported brief distinguish highest unlocked representation from proficiency, with fresh-check evidence separate.
+- Logo navigation preserves evidence. Explicit reset uses an in-page confirmation, avoiding a browser-native dialog that stalled the embedded preview during testing.
+- Copying the evidence brief also reveals a selectable, live-updating local text view, including when clipboard permission fails.
+- Narrow-screen hero decoration is removed and progress flows below the description. Focus uses a two-color indicator. Family activities follow the current skill; guidance reason/timing follows the fresh-check result.
+- Plans label completed-item replay before approval. The app accurately describes skill/aggregate coaching, optional model wording, fictional data processing, session lifetime, and demo-only tutor approval.
+- Incoming request cancellation reaches upstream work. Quota-map capacity fails closed rather than wiping active quotas; these are still non-durable per-isolate/IP limits.
+
+Verification: the final candidate, including inline reset and privacy wording, passed full lint, strict typecheck, production build, four artifact checks and 39 pure/API tests (43 total). Independent read-only engineering and educator/QA reviewers found no blocking regression in their bounded source checks. Artifact assertions also guard the explicit reset controls, export view, privacy text, and replay disclosure; they are not hydrated browser tests.
+
+Browser evidence for this repair: failed Connect check routes to Build; Build success explicitly does not establish Transfer proficiency; two failed checks remain visible; completed-item plan is labeled practice-only; logo preserves evidence; copying exposes the complete brief. A native browser confirmation stalled further interaction; it was replaced with the in-page flow. Final cancel/confirm and refreshed mobile visual checks must not be claimed passed until actually exercised.
+
+Remaining launch boundaries: this remains a fictional demo, not an authenticated or persistent student service. Durable paid-model quotas, real tutor authorization, consent/data lifecycle, screen-reader coverage and learner-outcome studies are not implemented by this release. Judge access, functioning sub-three-minute video, entrant information and terms assent remain submission gates. No live-model validation is claimed.
+
+The sections below are historical evidence for earlier versions, not the current verification result.
+
 ## September 14 quality pass
 
 Implemented nine interactive array-distractor paths across Build, Connect, and Transfer. The initial answers 10, 20, and 28 now lead to counting equal groups, restoring a missing row, and removing an extra row respectively. Row tasks are reversible and bridge answers remain disabled until the representation is correct. Supported bridge actions do not earn independent mastery credit. Other skills still have authored per-mission visual bridges, not individually branched distractor paths.

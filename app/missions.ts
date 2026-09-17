@@ -272,7 +272,7 @@ export const MISSIONS: Mission[] = [
     visual: { kind: "fraction", total: 12, denominator: 4, numerator: 1 },
     insightByAnswer: {
       4: "You named the number of groups instead of the amount in one group.",
-      8: "You left one group out rather than finding one fair share.",
+      8: "Eight matches taking away four from twelve. A fraction asks for equal shares, not subtraction.",
       11: "You removed one item instead of making four equal groups.",
     },
     defaultInsight: "The denominator tells how many equal groups to make.",
@@ -417,7 +417,7 @@ export const MISSIONS: Mission[] = [
     insightByAnswer: {
       6: "You found one third but did not combine two shares.",
       9: "You split the set into two groups instead of three.",
-      27: "You added the group size instead of taking two equal groups.",
+      27: "Twenty-seven is larger than the whole set. Two thirds must be less than the whole; first make three equal shares.",
     },
     defaultInsight: "Find one third first, then compose two of those shares.",
     learnerRead: "Nova is transferring the unit-fraction strategy to a new denominator and set size.",
@@ -452,7 +452,7 @@ export const MISSIONS: Mission[] = [
     visual: { kind: "number-line", start: 71, subtract: 46 },
     insightByAnswer: {
       35: "You subtracted 36 rather than all 46 marks.",
-      45: "The tens jump stopped one ten too early.",
+      45: "Forty-five matches moving back twenty-six marks. Check that the tens jump accounts for all four tens.",
       117: "You combined the distances instead of finding what remains.",
     },
     defaultInsight: "Decompose 46 into 40 and 6, then cross the final ten carefully.",

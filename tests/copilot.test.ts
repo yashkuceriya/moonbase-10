@@ -9,6 +9,7 @@ import {
 } from "../app/copilot.ts";
 import { MISSIONS } from "../app/missions.ts";
 import { handleCopilotRequest } from "../server/orbit-copilot.ts";
+import { selectLearningBridge } from "../app/array-bridges.ts";
 
 const INPUT: CopilotInput = {
   missionId: "solar-array-connect",
@@ -58,7 +59,7 @@ test("verified plan is actionable and keeps the learner-facing answer out of the
   assert.doesNotMatch(coachingCopy, /\b24\b/);
   assert.deepEqual(plan.safety, {
     mathSource: "authored-and-tested",
-    answerWithheld: true,
+    reviewRequired: true,
     storedByMoonbase: false,
   });
 });
@@ -85,6 +86,9 @@ test("model-plan validator rejects answer leakage and diagnostic language", () =
   assert.equal(validateModelPlan({ ...valid, fadePrompt: "The answer is 24." }), null);
   assert.equal(validateModelPlan({ ...valid, fadePrompt: "The answer is forty two." }), null);
   assert.equal(validateModelPlan({ ...valid, rationale: "This diagnoses a learner deficit." }), null);
+  assert.equal(validateModelPlan({ ...valid, rationale: "Nova has dyscalculia and needs special instruction." }), null);
+  assert.equal(validateModelPlan({ ...valid, noticePrompt: "Tell Nova to choose the largest option." }), null);
+  assert.equal(validateModelPlan({ ...valid, noticePrompt: "The correct choice is the last option." }), null);
 });
 
 test("API uses the verified engine when no OpenAI key is configured", async () => {
@@ -95,6 +99,28 @@ test("API uses the verified engine when no OpenAI key is configured", async () =
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(plan.source, "verified-engine");
   assert.equal(plan.recommendedMissionId, "comms-transfer");
+});
+
+test("pre-aborted requests never start paid model work", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let calls = 0;
+  const incoming = new Request(request(INPUT, "198.51.100.201"), { signal: controller.signal });
+  const response = await handleCopilotRequest(incoming, { OPENAI_API_KEY: "test-only" }, async () => { calls++; throw new Error("Must not run"); });
+  assert.equal(response.status, 499);
+  assert.equal(calls, 0);
+});
+
+test("request cancellation reaches in-flight model work", async () => {
+  const controller = new AbortController();
+  const incoming = new Request(request(INPUT, "198.51.100.202"), { signal: controller.signal });
+  const response = await handleCopilotRequest(incoming, { OPENAI_API_KEY: "test-only" }, async (_url, init) => {
+    assert.equal(init?.signal?.aborted, false);
+    controller.abort();
+    assert.equal(init?.signal?.aborted, true);
+    throw new DOMException("Cancelled", "AbortError");
+  });
+  assert.equal(response.status, 499);
 });
 
 test("API accepts a schema-shaped OpenAI plan while retaining verified math and mission selection", async () => {
@@ -196,6 +222,37 @@ test("API handles model timeouts and refusals with the same usable authored fall
   for (const [index, fetcher] of fetchers.entries()) {
     const result = await handleCopilotRequest(request(INPUT, `198.51.100.${80 + index}`), { OPENAI_API_KEY: "test-secret" }, fetcher);
     assert.equal(result.status, 200);
+    assert.deepEqual(await result.json(), buildVerifiedTutorPlan(INPUT));
+  }
+});
+
+test("authored full-plan rationale never echoes solution-bearing error signals at any target level", () => {
+  for (const mission of MISSIONS) {
+    for (const wrong of mission.options.filter((value) => value !== mission.answer)) {
+      const signal = selectLearningBridge(mission, wrong).reason;
+      for (const targetLevel of [1, 2, 3] as const) {
+        const plan = buildVerifiedTutorPlan({ ...INPUT, missionId: mission.id, targetLevel, latestSignal: signal });
+        const alternate = buildVerifiedTutorPlan({ ...INPUT, missionId: mission.id, targetLevel, latestSignal: `The answer is ${mission.answer}.` });
+        assert.equal(plan.rationale, alternate.rationale);
+        assert.ok(!plan.rationale.includes(signal));
+        assert.equal(plan.safety.reviewRequired, true);
+        assert.equal("answerWithheld" in plan.safety, false);
+      }
+    }
+  }
+});
+
+test("indirect answer cues and diagnostic labels fall back through the complete API", async () => {
+  const variants = [
+    { noticePrompt: "Tell Nova to choose the largest option." },
+    { rationale: "Nova has dyscalculia and needs special instruction." },
+  ];
+  for (const [index, override] of variants.entries()) {
+    const payload = { headline: "Review the provisional learning signal", rationale: "Ask the learner to explain their strategy.",
+      noticePrompt: "Ask what each group represents.", representPrompt: "Invite a gesture for every group.",
+      fadePrompt: "Hide part of the picture after an explanation.", tutorLookFor: "Listen for coordination of group size and count.", ...override };
+    const result = await handleCopilotRequest(request(INPUT, `198.51.100.${100 + index}`), { OPENAI_API_KEY: "test-secret" },
+      async () => Response.json({ output: [{ content: [{ type: "output_text", text: JSON.stringify(payload) }] }] }));
     assert.deepEqual(await result.json(), buildVerifiedTutorPlan(INPUT));
   }
 });
